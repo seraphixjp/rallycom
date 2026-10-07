@@ -1,0 +1,702 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#000000">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<title>ラリコン</title>
+<style>
+:root{
+  --bg:#000;--panel:#141414;--line:#2a2a2a;--btn:#1f1f1f;
+  --amber:#ffb300;--cyan:#4fc3f7;--ok:#00e676;--warn:#ffd54f;--bad:#ff5252;--dim:#9e9e9e;--fg:#fff;
+  --num:system-ui,Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:system-ui,"Hiragino Sans","Noto Sans JP",sans-serif;overflow:hidden;
+  user-select:none;-webkit-user-select:none;touch-action:manipulation}
+button{font:inherit;color:inherit;background:var(--btn);border:1px solid var(--line);border-radius:10px;cursor:pointer}
+button:active{background:#333}
+.num{font-family:var(--num);font-variant-numeric:tabular-nums;font-weight:800;letter-spacing:-.01em}
+#app{position:fixed;inset:0;display:flex;flex-direction:column;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+.view{flex:1;min-height:0;display:none}
+.view.on{display:block}
+.scroll{overflow-y:auto;padding:12px;-webkit-overflow-scrolling:touch}
+#tabs{display:flex;background:var(--panel)}
+#tabs button{flex:1;height:50px;border:0;border-radius:0;background:transparent;color:var(--dim);font-size:16px}
+#tabs button.on{color:var(--amber);font-weight:700}
+@media (orientation:landscape){#tabs button{height:36px;font-size:14px}}
+
+/* ---------- 走行画面 ---------- */
+#view-drive.on{display:grid;gap:6px;padding:6px;
+  grid-template-columns:1fr 1fr;
+  grid-template-rows:auto minmax(0,1fr) auto auto;
+  grid-template-areas:"top top" "nums nums" "minus plus" "ctrl ctrl"}
+#center{display:contents}
+#top{grid-area:top;display:flex;flex-direction:column;gap:6px}
+#nums{grid-area:nums;display:flex;flex-direction:column;gap:6px;min-height:0}
+#ctrl{grid-area:ctrl;display:flex;gap:8px}
+#minus{grid-area:minus}#plus{grid-area:plus}
+.step{height:84px;font-size:30px;font-weight:800;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
+.step small{font-size:14px;font-weight:400;color:var(--dim);margin-top:4px}
+#ctrl button{flex:1;height:60px;font-size:16px;font-weight:700;line-height:1.15}
+#ctrl small{font-size:11px;font-weight:400;color:var(--dim)}
+@media (orientation:landscape){
+  #view-drive.on{grid-template-columns:92px minmax(0,1fr) 92px;grid-template-rows:minmax(0,1fr);grid-template-areas:"minus center plus"}
+  #center{display:flex;flex-direction:column;gap:4px;grid-area:center;min-height:0;min-width:0}
+  #top{flex-direction:row;align-items:center}
+  #nums{flex:1;flex-direction:row}
+  #interP{flex:1.6}#totP{flex:1}
+  .step{height:auto}
+  #ctrl button{height:44px;font-size:14px}
+}
+.panel{background:var(--panel);border-radius:10px;padding:4px 10px;display:flex;flex-direction:column;min-height:0;min-width:0}
+#interP{flex:1}
+.lab{font-size:13px;color:var(--dim);display:flex;align-items:center;gap:6px}
+.lab .sp{flex:1}
+.badge{font-size:12px;font-weight:700;border-radius:4px;padding:0 6px;color:#000;background:var(--warn)}
+.badge.c{background:var(--cyan)}
+/* 枠いっぱいに数字を出す（コンテナ単位） */
+.fit{flex:1;min-height:0;container-type:size;display:flex;align-items:center;justify-content:flex-end;overflow:hidden}
+.fit span{white-space:nowrap;line-height:1;font-size:min(88cqh,calc(100cqw / (var(--ch) * .6)))}
+#inter{color:var(--amber);--ch:6}
+#inter.neg{color:var(--bad)}
+#total{--ch:6}#speed{--ch:3}
+#totP .fit{flex:1}
+@media (orientation:portrait){
+  #totP{flex:0 0 auto;flex-direction:row;align-items:stretch;gap:14px;height:104px}
+  #totP > div{min-width:0}
+}
+#clockRow{display:flex;align-items:center;gap:8px}
+#clock{color:var(--cyan);font-size:44px}
+#clock small{font-size:24px;opacity:.6}
+#gps{font-size:13px;margin-left:auto;text-align:right;line-height:1.3}
+@media (orientation:landscape){#clock{font-size:30px}#clock small{font-size:18px}#gps{display:none}#gpsDot{display:inline}}
+#gpsDot{display:none;font-size:14px}
+.strip{flex:1;display:flex;align-items:center;gap:8px;background:var(--panel);border-radius:8px;padding:6px 10px;min-width:0}
+.strip .l{flex:1;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.strip .r{font-size:22px;white-space:nowrap}
+@media (orientation:landscape){.strip{padding:3px 10px}.strip .l{font-size:15px}.strip .r{font-size:19px}}
+
+/* ---------- 共通部品 ---------- */
+.card{background:var(--panel);border-radius:10px;padding:12px;margin-bottom:10px;display:flex;flex-direction:column;gap:8px}
+.card h3{margin:0;font-size:14px;color:var(--dim);font-weight:400}
+.row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.row .grow{flex:1}
+.b{height:44px;padding:0 14px;font-size:15px;font-weight:700;background:#262626}
+.b.sel{background:var(--amber);color:#000}
+.b.big{height:60px;font-size:19px;width:100%}
+.b.okc{color:var(--ok)}.b.badc{color:var(--bad)}
+input[type=number],input[type=text]{background:#000;color:#fff;border:1px solid var(--line);border-radius:8px;height:44px;font-size:22px;padding:0 8px;font-family:var(--num);width:72px}
+input.w{width:120px}
+input:focus{outline:none;border-color:var(--amber)}
+.note{font-size:13px;color:var(--dim);line-height:1.5}
+.big1{font-size:40px}.big2{font-size:28px}.big3{font-size:56px}
+.sw{position:relative;width:52px;height:30px;border-radius:15px;background:#444;border:0;flex:0 0 auto}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:12px;background:#ddd;transition:left .15s}
+.sw.on{background:var(--amber)}.sw.on::after{left:25px;background:#000}
+table{width:100%;border-collapse:collapse;font-size:15px}
+td{padding:6px 4px;border-bottom:1px solid var(--line)}
+
+#lock{position:fixed;inset:0;display:none;z-index:10}
+#lock.on{display:block}
+#unlock{position:absolute;right:16px;bottom:16px;width:120px;height:64px;border-radius:10px;background:rgba(51,51,51,.85);color:var(--warn);font-size:13px;display:flex;align-items:center;justify-content:center;text-align:center}
+#start{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;text-align:center}
+#start.off{display:none}
+#start button{height:72px;padding:0 32px;font-size:22px;font-weight:800;background:var(--amber);color:#000;border:0}
+#toast{position:fixed;left:50%;bottom:70px;transform:translateX(-50%);background:#333;color:#fff;padding:10px 16px;border-radius:8px;font-size:15px;z-index:30;opacity:0;transition:opacity .2s;pointer-events:none}
+#toast.on{opacity:1}
+#simBadge{position:fixed;left:8px;bottom:56px;background:var(--cyan);color:#000;font-size:12px;font-weight:700;padding:2px 6px;border-radius:4px;z-index:5;display:none}
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- 走行 -->
+  <main id="view-drive" class="view on">
+    <button id="minus" class="step" data-step="-1">−<small id="stepL1">10m</small></button>
+    <div id="center">
+      <div id="top">
+        <div id="clockRow">
+          <span id="gpsDot">●</span>
+          <span id="clock" class="num">--:--:--<small>.0</small></span>
+          <div id="gps"></div>
+        </div>
+        <div class="strip" id="strip"><span class="l" id="stripL">区間未設定</span><b class="r num" id="stripR"></b></div>
+      </div>
+      <div id="nums">
+        <div class="panel" id="interP">
+          <div class="lab"><span id="interLab">INTER km</span><span class="sp"></span><span id="badges"></span></div>
+          <div class="fit"><span id="inter" class="num">0.00</span></div>
+        </div>
+        <div class="panel" id="totP">
+          <div style="display:flex;flex-direction:column;flex:1.4;min-height:0;min-width:0">
+            <div class="lab">TOTAL km</div>
+            <div class="fit"><span id="total" class="num">0.00</span></div>
+          </div>
+          <div style="display:flex;flex-direction:column;flex:1;min-height:0;min-width:0">
+            <div class="lab">km/h</div>
+            <div class="fit"><span id="speed" class="num">0</span></div>
+          </div>
+        </div>
+      </div>
+      <div id="ctrl">
+        <button id="rstInter" data-long="resetInter" data-hint="誤操作防止のため長押しでリセット">INTER 0<br><small>長押し</small></button>
+        <button id="freeze">FREEZE</button>
+        <button id="lockBtn">ロック</button>
+      </div>
+    </div>
+    <button id="plus" class="step" data-step="1">＋<small id="stepL2">10m</small></button>
+  </main>
+
+  <!-- TC・SS -->
+  <section id="view-tc" class="view scroll">
+    <div class="card"><span id="clock2" class="num big1" style="color:var(--cyan)"></span></div>
+    <div class="card">
+      <div class="row"><h3>次のTC</h3><input type="text" id="tcLabel" class="w"></div>
+      <div id="tcInfo"></div>
+      <div class="row">
+        <span class="note">スタート</span>
+        <input type="number" id="secH" min="0" max="23" inputmode="numeric"> :
+        <input type="number" id="secM" min="0" max="59" inputmode="numeric"> ＋
+        <input type="number" id="secD" min="0" inputmode="numeric"> <span class="note">分</span>
+      </div>
+      <div class="row">
+        <button class="b grow" id="setSection">目標を設定</button>
+        <button class="b grow" id="nowStart">今をスタートに</button>
+      </div>
+      <div class="row"><span class="grow" id="nextSsLab" style="font-size:14px"></span><button class="sw" id="swNextSs"></button></div>
+      <div class="row" id="gapRow"><span class="note">間隔</span><button class="b" id="gapM">−1分</button><b id="gapV"></b><button class="b" id="gapP">＋1分</button></div>
+      <h3>チェックイン（カードに書かれた時刻）</h3>
+      <div class="row">
+        <button class="b" id="ciM">−1分</button>
+        <b id="ciV" class="num big2"></b>
+        <button class="b" id="ciP">＋1分</button>
+        <span class="grow note" id="ciDiff" style="text-align:right"></span>
+      </div>
+      <button class="b big okc" id="checkIn" data-long="checkIn" data-hint="長押しで記録（誤操作防止）">チェックイン記録</button>
+    </div>
+    <div class="card">
+      <div class="row"><h3>SS</h3><input type="text" id="ssLabel" class="w"></div>
+      <div id="ssInfo"></div>
+      <button class="b big okc" id="ssFin" style="display:none;height:72px">FINISH（フィニッシュ通過）</button>
+      <div class="row">
+        <span class="note">スタート時刻</span>
+        <input type="number" id="ssH" min="0" max="23" inputmode="numeric"> :
+        <input type="number" id="ssMi" min="0" max="59" inputmode="numeric">
+        <button class="b" id="ssSet">設定</button>
+        <button class="b" id="ssClear">取消</button>
+      </div>
+      <div class="row"><span class="grow" style="font-size:14px">スタートでINTERを0にする</span><button class="sw" id="swSsReset"></button></div>
+      <div class="note">30・15・10秒前は音声、5秒前から毎秒ビープでお知らせします</div>
+    </div>
+  </section>
+
+  <!-- 記録 -->
+  <section id="view-rec" class="view scroll">
+    <div class="card"><h3>TC</h3><table id="tcTable"></table><div id="penalty" class="note" style="color:var(--warn)"></div></div>
+    <div class="card"><h3>SS（自分の計測・参考）</h3><table id="ssTable"></table></div>
+    <div class="row">
+      <button class="b grow" id="share">記録を送る（LINE・メール等）</button>
+      <button class="b badc" id="clearRec" data-long="clearRecords" data-hint="長押しで全消去">全消去（長押し）</button>
+    </div>
+  </section>
+
+  <!-- 設定 -->
+  <section id="view-set" class="view scroll">
+    <div class="card">
+      <h3>距離の補正係数</h3>
+      <span id="factorV" class="num big2" style="color:var(--amber)"></span>
+      <div id="calibOn">
+        <div id="calibRaw" style="color:var(--cyan);font-size:18px"></div>
+        <div class="row"><span class="note">公式距離</span><input type="number" id="calibOff" class="w" step="0.01" inputmode="decimal"><span class="note">km</span><button class="b" id="calibOk">確定</button><button class="b" id="calibCancel">中止</button></div>
+      </div>
+      <div id="calibOff2">
+        <div class="note">ロードブックの「トリップメーター補正」区間の始点で開始→終点で公式距離を入れます。前回の係数を信用せず、毎回やり直すのがおすすめです。</div>
+        <button class="b" id="calibStart">オドチェック開始（始点で押す）</button>
+        <div class="row"><span class="note">手入力</span><input type="number" id="factorIn" class="w" step="0.00001" inputmode="decimal"><button class="b" id="factorSet">反映</button><button class="b" id="factor1">1.0</button></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>± ボタン1回の距離</h3>
+      <div class="row" id="stepSel"><button class="b grow" data-v="10">10m</button><button class="b grow" data-v="50">50m</button><button class="b grow" data-v="100">100m</button></div>
+      <div class="row"><span class="grow" style="font-size:14px">±をTOTALにも反映</span><button class="sw" id="swAdjTotal"></button></div>
+      <h3>距離を直接合わせる（コマ図の距離に）</h3>
+      <div class="row"><input type="number" id="setTo" class="w" step="0.01" inputmode="decimal"><span class="note">km</span><button class="b" id="setInter">INTERに</button><button class="b" id="setTotal">TOTALに</button></div>
+      <h3>INTERの減算モード（次のコマまでの距離→0に向かって減る）</h3>
+      <div class="row"><input type="number" id="downTo" class="w" step="0.01" inputmode="decimal"><span class="note">km</span><button class="b" id="downStart">減算開始</button><button class="b" id="downEnd">解除</button></div>
+      <button class="b badc" id="resetAll" data-long="resetTotal" data-hint="長押しでリセット">TOTAL・INTERを全部0（長押し）</button>
+    </div>
+    <div class="card">
+      <h3>時計を公式時計に合わせる</h3>
+      <div class="note">Web版は端末の時計を使います。スマホの「日付と時刻を自動設定」をONにしてください。公式時計とずれていたらここで合わせます。</div>
+      <div id="manualV" style="color:var(--amber);font-size:20px"></div>
+      <div class="row"><button class="b grow" data-clk="-1000">−1秒</button><button class="b grow" data-clk="-100">−0.1</button><button class="b grow" data-clk="100">+0.1</button><button class="b grow" data-clk="1000">+1秒</button></div>
+      <button class="b" id="clk0">手動補正を0に</button>
+    </div>
+    <div class="card">
+      <h3>画面</h3>
+      <button class="b" id="fullBtn">全画面＋横に固定</button>
+      <div class="note">画面は自動で消えないようにしています。画面を消したり他のアプリに切り替えると、その間は計測が止まります（戻ったら直線距離で補います）。競技ではアプリ版をおすすめします。</div>
+    </div>
+    <div class="card">
+      <div class="row"><span class="grow" style="font-size:14px">音声案内</span><button class="sw" id="swVoice"></button></div>
+      <div class="note">物理ボタン（Bluetoothのプレゼン用リモコン・キーボード）<br>
+        ・次へ（→ / PageDown）・↑ … 距離＋<br>
+        ・前へ（← / PageUp）・↓ … 距離−<br>
+        ・Enter / スペース … FREEZE<br>
+        Web版では本体の音量キーは使えません。</div>
+    </div>
+    <div class="card">
+      <div class="note" id="gpsInfo"></div>
+      <div class="note">ラリコン Web版 0.1.0</div>
+    </div>
+  </section>
+
+  <nav id="tabs">
+    <button data-v="drive" class="on">走行</button><button data-v="tc">TC・SS</button><button data-v="rec">記録</button><button data-v="set">設定</button>
+  </nav>
+</div>
+
+<div id="lock"><div id="unlock">ロック中<br>長押しで解除</div></div>
+<div id="start">
+  <div style="font-size:20px;font-weight:800">ラリコン</div>
+  <div class="note">タップすると、位置情報・音・画面の点灯を有効にします</div>
+  <button id="startBtn">計測を開始</button>
+</div>
+<div id="toast"></div>
+<div id="simBadge">シミュレーション</div>
+
+<script>
+'use strict';
+// ================= 状態 =================
+const KEY = 'rallycom.v1';
+const DEF = {
+  totalRaw:0, interRaw:0, totalAdj:0, interAdj:0, factor:1,
+  interDown:false, interTarget:0, frozen:false, frozenInter:0, frozenTotal:0,
+  step:10, adjTotal:true, calibActive:false, calibRaw:0,
+  manualOffset:0, voice:true,
+  tcLabel:'TC1', secStart:null, secDur:0, nextIsSs:false, ssGap:3,
+  ssLabel:'SS1', ssStart:null, ssFinish:null, ssResetTrips:true,
+  tcRecords:[], ssRecords:[], gapCount:0,
+};
+let S = Object.assign({}, DEF);
+try { Object.assign(S, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
+S.frozen = S.frozen || false;
+let lastSave = 0;
+function save(){ lastSave = Date.now(); try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+
+// 走行中だけの値（保存しない）
+const R = { speed:0, maxSpeed:0, acc:-1, lastFix:0, prev:null, prevSpeed:0, locked:false, running:false, gpsErr:'' };
+
+const interM = () => S.interRaw * S.factor + S.interAdj;
+const totalM = () => S.totalRaw * S.factor + S.totalAdj;
+function interShown(){ const v = S.frozen ? S.frozenInter : interM(); return S.interDown ? S.interTarget - v : v; }
+const totalShown = () => S.frozen ? S.frozenTotal : totalM();
+const targetMs = () => (S.secStart != null && S.secDur > 0) ? S.secStart + S.secDur * 60000 : null;
+const now = () => Date.now() + S.manualOffset;
+
+// ================= 表示フォーマット =================
+const p2 = n => String(n).padStart(2, '0');
+const hm = ms => { const d = new Date(ms); return p2(d.getHours()) + ':' + p2(d.getMinutes()); };
+const hms = ms => { const d = new Date(ms); return hm(ms) + ':' + p2(d.getSeconds()); };
+const km = m => (m < 0 ? '-' : '') + (Math.abs(m) / 1000).toFixed(2);
+function mmss(ms){ const neg = ms < 0, t = Math.floor(Math.abs(ms) / 1000); return (neg ? '+' : '') + Math.floor(t / 60) + ':' + p2(t % 60); }
+function stageTime(ms){ const t = Math.round(ms / 100); return Math.floor(t / 600) + ':' + p2(Math.floor((t % 600) / 10)) + '.' + (t % 10); }
+function diffText(d){ return d === 0 ? '定刻' : d > 0 ? `遅着 ${d}分（ペナ ${d * 10}秒）` : `早着 ${-d}分（ペナ ${-d}分）`; }
+const minFloor = ms => Math.floor(ms / 60000) * 60000;
+function minuteToday(h, m){
+  const n = now(), d = new Date(n); d.setHours(h, m, 0, 0); let t = d.getTime();
+  if (t < n - 12 * 3600e3) t += 24 * 3600e3;
+  if (t > n + 12 * 3600e3) t -= 24 * 3600e3;
+  return t;
+}
+function nextLabel(l){ const m = /^(.*?)(\d+)$/.exec(l); return m ? m[1] + (+m[2] + 1) : l; }
+
+// ================= GPS → 距離 =================
+const MAX_ACC = 25, STILL = 0.7, GAP = 3;
+function hav(a, b){
+  const R0 = 6371008.8, r = Math.PI / 180;
+  const dLat = (b.lat - a.lat) * r, dLon = (b.lon - a.lon) * r;
+  const x = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLon / 2) ** 2;
+  return 2 * R0 * Math.asin(Math.sqrt(x));
+}
+function onPos(lat, lon, acc, speed, t){
+  R.acc = acc;
+  if (!(acc <= MAX_ACC)) return;
+  const cur = { lat, lon, t };
+  const v = (speed != null && isFinite(speed) && speed >= 0) ? speed : null;
+  let add = 0, gap = false;
+  const p = R.prev;
+  if (p) {
+    const dt = (t - p.t) / 1000;
+    if (dt <= 0) return;
+    const chord = hav(p, cur);
+    if (dt < GAP) {
+      const vNow = v ?? chord / dt;
+      if (vNow < STILL && R.prevSpeed < STILL) add = 0;
+      else {
+        // ドップラー速度の積分（カーブで距離が縮まない）。速度がおかしい時は直線距離
+        const d = (R.prevSpeed + vNow) / 2 * dt;
+        add = (d > chord * 2 + 30 || d < chord * 0.6 - 10) ? chord : d;
+      }
+      R.prevSpeed = vNow;
+    } else {
+      // 欠測明け（トンネル・画面オフ）：直線距離で埋める
+      if (chord / dt < 70) add = chord;
+      gap = true;
+      R.prevSpeed = v ?? 0;
+    }
+  } else R.prevSpeed = v ?? 0;
+  R.prev = cur;
+  R.lastFix = performance.now();
+  R.speed = R.prevSpeed * 3.6;
+  R.maxSpeed = Math.max(R.maxSpeed, R.speed);
+  S.totalRaw += add; S.interRaw += add;
+  if (S.calibActive) S.calibRaw += add;
+  if (gap) S.gapCount++;
+  if (Date.now() - lastSave > 2000) save();
+}
+let watchId = null;
+function startGps(){
+  if (!('geolocation' in navigator)) { R.gpsErr = 'この端末は位置情報に対応していません'; return; }
+  if (watchId != null) navigator.geolocation.clearWatch(watchId);
+  watchId = navigator.geolocation.watchPosition(
+    pos => { R.running = true; R.gpsErr = ''; const c = pos.coords; onPos(c.latitude, c.longitude, c.accuracy, c.speed, pos.timestamp); },
+    err => { R.gpsErr = err.code === 1 ? '位置情報が許可されていません' : '測位エラー：' + err.message; },
+    { enableHighAccuracy:true, maximumAge:0, timeout:15000 });
+}
+const gpsAge = () => R.lastFix ? (performance.now() - R.lastFix) / 1000 : Infinity;
+
+// ================= 操作 =================
+const A = {
+  step(sign){
+    const d = sign * S.step;
+    S.interAdj += S.interDown ? -d : d;
+    if (S.adjTotal) S.totalAdj += d;
+    S.frozenInter += S.interDown ? -d : d;
+    save(); flash(sign > 0 ? 'plus' : 'minus');
+  },
+  resetInter(){ S.interRaw = 0; S.interAdj = 0; S.frozen = false; save(); toast('INTERを0にしました'); },
+  resetTotal(){ Object.assign(S, { totalRaw:0, totalAdj:0, interRaw:0, interAdj:0, frozen:false, gapCount:0 }); R.maxSpeed = 0; save(); toast('全部0にしました'); },
+  freeze(){ if (S.frozen) S.frozen = false; else { S.frozen = true; S.frozenInter = interM(); S.frozenTotal = totalM(); } save(); },
+  setInterTo(m){ const want = S.interDown ? S.interTarget - m : m; S.interAdj = want - S.interRaw * S.factor; S.frozen = false; save(); },
+  setTotalTo(m){ S.totalAdj = m - S.totalRaw * S.factor; save(); },
+  down(m){ if (m == null) S.interDown = false; else Object.assign(S, { interDown:true, interTarget:m, interRaw:0, interAdj:0, frozen:false }); save(); },
+  checkIn(){
+    const actual = ciActual();
+    const target = targetMs() ?? actual;
+    S.tcRecords.push({ l:S.tcLabel, t:target, a:actual });
+    S.tcLabel = nextLabel(S.tcLabel);
+    if (S.nextIsSs) {
+      const st = actual + S.ssGap * 60000;
+      Object.assign(S, { ssStart:st, ssFinish:null, secStart:st, secDur:0, nextIsSs:false });
+      lastSsCue = Infinity;
+    } else Object.assign(S, { secStart:actual, secDur:0 });
+    ciOverride = null; save();
+    toast(`${S.tcRecords.at(-1).l} ${hm(actual)} を記録`);
+  },
+  ssFinish(){
+    if (S.ssStart == null) return; const n = now(); if (n <= S.ssStart) return;
+    const fin = Math.floor(n / 100) * 100;
+    S.ssFinish = fin; S.ssRecords.push({ l:S.ssLabel, s:S.ssStart, f:fin }); S.ssLabel = nextLabel(S.ssLabel); save();
+  },
+  clearRecords(){ S.tcRecords = []; S.ssRecords = []; save(); toast('記録を消しました'); },
+};
+
+// ================= 音・声・振動 =================
+let ac = null;
+function beep(freq, ms){
+  if (!ac) return;
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.frequency.value = freq; o.type = 'square'; g.gain.value = 0.25;
+  o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + ms / 1000);
+}
+function say(t){
+  if (!S.voice || !('speechSynthesis' in window)) return;
+  speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.lang = 'ja-JP'; u.rate = 1.15; speechSynthesis.speak(u);
+}
+const vib = ms => navigator.vibrate && navigator.vibrate(ms);
+
+// ================= 毎100ms =================
+let lastSsCue = Infinity, zoneCued = 0, targetCued = 0, gpsLostCued = false;
+function tick(){
+  const n = now();
+  // SSカウントダウン
+  if (S.ssStart != null && S.ssFinish == null) {
+    const remain = S.ssStart - n, sec = Math.ceil(remain / 1000);
+    if (remain > 0 && [30, 15, 10, 5, 4, 3, 2, 1].includes(sec) && sec < lastSsCue) {
+      lastSsCue = sec;
+      if (sec <= 5) { beep(1000, 150); vib(80); } else { beep(880, 200); say(sec + '秒前'); }
+    } else if (remain <= 0 && remain > -1500 && lastSsCue !== 0) {
+      lastSsCue = 0; beep(1400, 900); vib(600);
+      if (S.ssResetTrips) { S.interRaw = 0; S.interAdj = 0; S.frozen = false; S.interDown = false; save(); }
+    } else if (remain > 31000) lastSsCue = Infinity;
+  }
+  // TC
+  const t = targetMs();
+  if (t != null) {
+    if (n >= t - 60000 && n < t - 55000 && zoneCued !== t) { zoneCued = t; beep(880, 300); say('目標の1分前です。ゾーンに入れます'); }
+    if (n >= t && n < t + 5000 && targetCued !== t) { targetCued = t; beep(1200, 400); vib(300); say('目標時刻です'); }
+  }
+  // GPSロスト
+  if (R.running && R.speed > 10 && gpsAge() > 5) { if (!gpsLostCued) { gpsLostCued = true; beep(300, 400); say('GPSが途切れました'); } }
+  else if (gpsAge() < 2) gpsLostCued = false;
+  render(n);
+}
+
+// ================= 描画 =================
+const $ = id => document.getElementById(id);
+function tcStatus(n, t){
+  if (n < t - 60000) return ['あと ' + mmss(t - n), 'var(--fg)'];
+  if (n < t) return ['ゾーン可 あと ' + mmss(t - n), 'var(--warn)'];
+  if (n < t + 60000) return ['今出せば定刻 残' + Math.floor((t + 60000 - n) / 1000) + '秒', 'var(--ok)'];
+  return ['遅着 ' + Math.floor((n - t) / 60000) + '分', 'var(--bad)'];
+}
+function setText(id, v){ const e = $(id); if (e.textContent !== v) e.textContent = v; }
+let view = 'drive';
+let ciOverride = null;
+const ciActual = () => ciOverride ?? minFloor(now());
+
+function render(n){
+  // 時計
+  const tenth = Math.floor((n % 1000) / 100);
+  $('clock').innerHTML = hms(n) + '<small>.' + tenth + '</small>';
+  // GPS
+  const age = gpsAge();
+  let gt, gc;
+  if (R.gpsErr) { gt = R.gpsErr; gc = 'var(--bad)'; }
+  else if (!isFinite(age)) { gt = 'GPS 測位待ち'; gc = 'var(--warn)'; }
+  else if (age > 3) { gt = 'GPS ロスト ' + Math.floor(age) + '秒'; gc = 'var(--bad)'; }
+  else { gt = 'GPS ±' + Math.round(R.acc) + 'm'; gc = R.acc > 15 ? 'var(--warn)' : 'var(--ok)'; }
+  $('gps').innerHTML = `<span style="color:${gc}">● ${gt}</span>` + (S.manualOffset ? `<br><span style="color:var(--dim)">補正 ${(S.manualOffset / 1000).toFixed(1)}秒</span>` : '');
+  $('gpsDot').style.color = gc;
+
+  // 状況ストリップ
+  let L = '区間未設定', Rt = 'TC・SSタブで入力', C = 'var(--dim)';
+  const t = targetMs();
+  if (S.ssStart != null && S.ssFinish == null && n < S.ssStart) { L = `${S.ssLabel} スタート ${hms(S.ssStart)}`; Rt = 'あと ' + mmss(S.ssStart - n); C = S.ssStart - n <= 30000 ? 'var(--warn)' : 'var(--fg)'; }
+  else if (S.ssStart != null && S.ssFinish == null && n - S.ssStart < 3600e3) { L = `${S.ssLabel} 走行中`; Rt = stageTime(n - S.ssStart); C = 'var(--ok)'; }
+  else if (t != null) { [Rt, C] = tcStatus(n, t); L = `${S.tcLabel} 目標 ${hm(t)}`; }
+  else if (S.secStart != null) { L = `${S.tcLabel} 区間スタート ${hm(S.secStart)}`; Rt = '所要時間を入力'; C = 'var(--warn)'; }
+  setText('stripL', L); setText('stripR', Rt); $('stripR').style.color = C;
+
+  // 距離
+  const iv = interShown();
+  const is = km(iv), ts = km(totalShown());
+  setText('inter', is); $('inter').classList.toggle('neg', S.interDown && iv < 0);
+  setText('total', ts);
+  // 桁数に合わせて文字を最大化（12.34なら5桁ぶん、123.45になったら6桁ぶん）
+  $('inter').style.setProperty('--ch', Math.max(is.length, 5));
+  $('total').style.setProperty('--ch', Math.max(ts.length, 5));
+  setText('speed', String(Math.round(R.speed)));
+  setText('interLab', S.interDown ? 'INTER ▼ 残り km' : 'INTER km');
+  $('badges').innerHTML = (S.frozen ? '<span class="badge">FREEZE</span>' : '') + (S.calibActive ? ' <span class="badge c">校正中</span>' : '');
+  setText('stepL1', S.step + 'm'); setText('stepL2', S.step + 'm');
+  setText('freeze', S.frozen ? '解除' : 'FREEZE'); $('freeze').style.color = S.frozen ? 'var(--warn)' : '';
+
+  if (view === 'tc') renderTc(n);
+  if (view === 'set') renderSet();
+}
+
+function renderTc(n){
+  setText('clock2', hms(n));
+  const t = targetMs();
+  if (t != null) {
+    const [m, c] = tcStatus(n, t);
+    $('tcInfo').innerHTML = `<div class="num big1">目標 ${hm(t)}</div><div class="num big2" style="color:${c}">${m}</div><div class="note">区間スタート ${hm(S.secStart)} ＋ ${S.secDur}分</div>`;
+  } else $('tcInfo').innerHTML = '<div class="note">区間スタート時刻と目標所要時間（分）を入れてください。チェックインやSSスタートを記録すると、スタート時刻は自動で入ります</div>';
+  setText('nextSsLab', `このTCの次はSS（チェックイン＋${S.ssGap}分でスタート）`);
+  $('swNextSs').classList.toggle('on', S.nextIsSs);
+  $('gapRow').style.display = S.nextIsSs ? '' : 'none'; setText('gapV', S.ssGap + '分');
+  const a = ciActual(); setText('ciV', hm(a));
+  if (t != null) { const d = Math.round((a - t) / 60000); setText('ciDiff', diffText(d)); $('ciDiff').style.color = d === 0 ? 'var(--ok)' : 'var(--bad)'; }
+  else setText('ciDiff', '');
+  // SS
+  const st = S.ssStart;
+  let h = '';
+  if (st != null && S.ssFinish == null) {
+    h = `<div class="num big2">スタート ${hms(st)}</div>`;
+    if (n < st) h += `<div class="num big3" style="color:${st - n <= 30000 ? 'var(--warn)' : 'var(--fg)'}">あと ${mmss(st - n)}</div>`;
+    else h += `<div class="num big3" style="color:var(--ok)">${stageTime(n - st)}</div>`;
+  } else if (S.ssFinish != null && S.ssRecords.length) {
+    const r = S.ssRecords.at(-1); h = `<div style="color:var(--ok);font-size:18px">${r.l} タイム ${stageTime(r.f - r.s)}（自分の計測・参考）</div>`;
+  }
+  if ($('ssInfo').innerHTML !== h) $('ssInfo').innerHTML = h;
+  $('ssFin').style.display = (st != null && S.ssFinish == null && n >= st) ? '' : 'none';
+  $('swSsReset').classList.toggle('on', S.ssResetTrips);
+}
+
+function renderSet(){
+  setText('factorV', S.factor.toFixed(5));
+  $('calibOn').style.display = S.calibActive ? '' : 'none';
+  $('calibOff2').style.display = S.calibActive ? 'none' : '';
+  setText('calibRaw', `オドチェック中：${km(S.calibRaw)} km（補正前）`);
+  document.querySelectorAll('#stepSel button').forEach(b => b.classList.toggle('sel', +b.dataset.v === S.step));
+  $('swAdjTotal').classList.toggle('on', S.adjTotal);
+  $('swVoice').classList.toggle('on', S.voice);
+  setText('manualV', `手動補正：${S.manualOffset >= 0 ? '+' : ''}${(S.manualOffset / 1000).toFixed(1)}秒`);
+  setText('gpsInfo', `欠測（トンネル・画面オフ等）：${S.gapCount}回　最高速 ${Math.round(R.maxSpeed)}km/h`);
+}
+
+function renderRec(){
+  $('tcTable').innerHTML = S.tcRecords.length ? S.tcRecords.map((r, i) => {
+    const d = Math.round((r.a - r.t) / 60000);
+    return `<tr><td>${r.l}</td><td class="num">${hm(r.t)} → ${hm(r.a)}</td><td style="color:${d ? 'var(--bad)' : 'var(--ok)'};font-size:13px">${diffText(d)}</td><td><button class="b" data-del-tc="${i}">削除</button></td></tr>`;
+  }).join('') : '<tr><td class="note">まだありません</td></tr>';
+  let late = 0, early = 0;
+  S.tcRecords.forEach(r => { const d = Math.round((r.a - r.t) / 60000); if (d > 0) late += d; else early -= d; });
+  $('penalty').textContent = (late + early) ? `ペナルティ計：遅着 ${late * 10}秒 ／ 早着 ${early}分　累積遅れ ${late}分（30分超で離脱）` : '';
+  $('ssTable').innerHTML = S.ssRecords.length ? S.ssRecords.map((r, i) =>
+    `<tr><td>${r.l}</td><td class="num" style="color:var(--ok);font-size:20px">${stageTime(r.f - r.s)}</td><td><button class="b" data-del-ss="${i}">削除</button></td></tr>`
+  ).join('') : '<tr><td class="note">まだありません</td></tr>';
+}
+function exportText(){
+  let s = 'ラリコン 記録\n補正係数 ' + S.factor.toFixed(5) + '\n\n[TC]\n';
+  S.tcRecords.forEach(r => s += `${r.l}  目標 ${hm(r.t)}  実際 ${hm(r.a)}  ${diffText(Math.round((r.a - r.t) / 60000))}\n`);
+  s += '\n[SS]\n';
+  S.ssRecords.forEach(r => s += `${r.l}  スタート ${hms(r.s)}  タイム ${stageTime(r.f - r.s)}\n`);
+  return s;
+}
+
+// ================= UI配線 =================
+function toast(m){ const t = $('toast'); t.textContent = m; t.classList.add('on'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('on'), 1600); }
+function flash(id){ const e = $(id); e.style.background = '#444'; setTimeout(() => e.style.background = '', 120); }
+const on = (id, f) => $(id).addEventListener('click', f);
+
+document.querySelectorAll('#tabs button').forEach(b => b.addEventListener('click', () => {
+  view = b.dataset.v;
+  document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b));
+  document.querySelectorAll('.view').forEach(v => v.classList.toggle('on', v.id === 'view-' + view));
+  if (view === 'tc') { fillTcInputs(); }
+  if (view === 'rec') renderRec();
+  if (view === 'set') $('factorIn').value = S.factor.toFixed(5);
+}));
+
+// ±ボタン：押した瞬間に反応（clickより速い）
+['minus', 'plus'].forEach(id => $(id).addEventListener('pointerdown', e => { e.preventDefault(); A.step(+$(id).dataset.step); }));
+
+// 長押しボタン共通
+document.querySelectorAll('[data-long]').forEach(b => {
+  let h = null, done = false;
+  b.addEventListener('pointerdown', () => { done = false; h = setTimeout(() => { done = true; vib(60); A[b.dataset.long](); if (view === 'rec') renderRec(); }, 700); });
+  const cancel = () => clearTimeout(h);
+  b.addEventListener('pointerup', cancel); b.addEventListener('pointerleave', cancel); b.addEventListener('pointercancel', cancel);
+  b.addEventListener('click', () => { if (!done) toast(b.dataset.hint); });
+});
+on('freeze', () => A.freeze());
+on('lockBtn', () => { R.locked = true; $('lock').classList.add('on'); });
+(() => { let h; const u = $('unlock');
+  u.addEventListener('pointerdown', () => { h = setTimeout(() => { R.locked = false; $('lock').classList.remove('on'); vib(60); }, 800); });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => u.addEventListener(ev, () => clearTimeout(h)));
+})();
+
+// TC
+function fillTcInputs(){
+  $('tcLabel').value = S.tcLabel; $('ssLabel').value = S.ssLabel;
+  if (S.secStart != null) { const d = new Date(S.secStart); $('secH').value = p2(d.getHours()); $('secM').value = p2(d.getMinutes()); } else { $('secH').value = ''; $('secM').value = ''; }
+  $('secD').value = S.secDur > 0 ? S.secDur : '';
+  if (S.ssStart != null) { const d = new Date(S.ssStart); $('ssH').value = p2(d.getHours()); $('ssMi').value = p2(d.getMinutes()); } else { $('ssH').value = ''; $('ssMi').value = ''; }
+}
+$('tcLabel').addEventListener('change', e => { S.tcLabel = e.target.value || 'TC'; save(); });
+$('ssLabel').addEventListener('change', e => { S.ssLabel = e.target.value || 'SS'; save(); });
+on('setSection', () => {
+  const h = parseInt($('secH').value), m = parseInt($('secM').value), d = parseInt($('secD').value) || 0;
+  if (!(h >= 0 && h <= 23 && m >= 0 && m <= 59)) return toast('時刻を確認してください');
+  S.secStart = minuteToday(h, m); S.secDur = Math.max(0, Math.min(1440, d)); save(); toast('目標を設定しました');
+});
+on('nowStart', () => { const d = new Date(minFloor(now())); $('secH').value = p2(d.getHours()); $('secM').value = p2(d.getMinutes()); });
+on('swNextSs', () => { S.nextIsSs = !S.nextIsSs; save(); });
+on('gapM', () => { S.ssGap = Math.max(0, S.ssGap - 1); save(); });
+on('gapP', () => { S.ssGap = Math.min(30, S.ssGap + 1); save(); });
+on('ciM', () => { ciOverride = ciActual() - 60000; });
+on('ciP', () => { ciOverride = ciActual() + 60000; });
+on('ssSet', () => {
+  const h = parseInt($('ssH').value), m = parseInt($('ssMi').value);
+  if (!(h >= 0 && h <= 23 && m >= 0 && m <= 59)) return toast('時刻を確認してください');
+  const st = minuteToday(h, m); Object.assign(S, { ssStart:st, ssFinish:null, secStart:st, secDur:0 }); lastSsCue = Infinity; save(); toast('SSスタートを設定しました');
+});
+on('ssClear', () => { S.ssStart = null; S.ssFinish = null; save(); fillTcInputs(); });
+on('ssFin', () => A.ssFinish());
+on('swSsReset', () => { S.ssResetTrips = !S.ssResetTrips; save(); });
+
+// 記録
+on('share', async () => {
+  const txt = exportText();
+  try { if (navigator.share) await navigator.share({ text: txt }); else { await navigator.clipboard.writeText(txt); toast('コピーしました'); } } catch (e) {}
+});
+$('view-rec').addEventListener('click', e => {
+  const t = e.target.dataset.delTc, s = e.target.dataset.delSs;
+  if (t != null) { S.tcRecords.splice(+t, 1); save(); renderRec(); }
+  if (s != null) { S.ssRecords.splice(+s, 1); save(); renderRec(); }
+});
+
+// 設定
+on('calibStart', () => { S.calibActive = true; S.calibRaw = 0; save(); });
+on('calibCancel', () => { S.calibActive = false; save(); });
+on('calibOk', () => {
+  const v = parseFloat($('calibOff').value) * 1000;
+  if (!(S.calibRaw >= 100 && v > 0)) return toast('距離が短すぎます');
+  const f = v / S.calibRaw; if (f < 0.8 || f > 1.2) return toast('差が大きすぎます（±20%以内）');
+  S.factor = f; S.calibActive = false; save(); toast('係数 ' + f.toFixed(5) + ' にしました');
+});
+on('factorSet', () => { const f = parseFloat($('factorIn').value); if (f >= 0.8 && f <= 1.2) { S.factor = f; save(); } else toast('0.8〜1.2の範囲で'); });
+on('factor1', () => { S.factor = 1; save(); $('factorIn').value = '1.00000'; });
+document.querySelectorAll('#stepSel button').forEach(b => b.addEventListener('click', () => { S.step = +b.dataset.v; save(); }));
+on('swAdjTotal', () => { S.adjTotal = !S.adjTotal; save(); });
+on('setInter', () => { const v = parseFloat($('setTo').value); if (isFinite(v)) A.setInterTo(v * 1000); });
+on('setTotal', () => { const v = parseFloat($('setTo').value); if (isFinite(v)) A.setTotalTo(v * 1000); });
+on('downStart', () => { const v = parseFloat($('downTo').value); if (v > 0) A.down(v * 1000); });
+on('downEnd', () => A.down(null));
+document.querySelectorAll('[data-clk]').forEach(b => b.addEventListener('click', () => { S.manualOffset += +b.dataset.clk; save(); }));
+on('clk0', () => { S.manualOffset = 0; save(); });
+on('swVoice', () => { S.voice = !S.voice; save(); });
+on('fullBtn', goFull);
+
+// 物理キー（プレゼン用リモコン・キーボード）
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  const k = e.key;
+  if (['ArrowRight', 'PageDown', 'ArrowUp', '+', '=', 'AudioVolumeUp'].includes(k)) { e.preventDefault(); A.step(+1); }
+  else if (['ArrowLeft', 'PageUp', 'ArrowDown', '-', 'AudioVolumeDown'].includes(k)) { e.preventDefault(); A.step(-1); }
+  else if ((k === 'Enter' || k === ' ') && !e.repeat) { e.preventDefault(); A.freeze(); }
+});
+
+// ================= 起動 =================
+let wakeLock = null;
+async function keepAwake(){ try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {} }
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') keepAwake(); else save(); });
+async function goFull(){
+  try { await document.documentElement.requestFullscreen({ navigationUI:'hide' }); } catch (e) {}
+  try { await screen.orientation.lock('landscape'); } catch (e) {}
+}
+on('startBtn', async () => {
+  try { ac = new (window.AudioContext || window.webkitAudioContext)(); await ac.resume(); } catch (e) {}
+  if ('speechSynthesis' in window) { const u = new SpeechSynthesisUtterance(''); speechSynthesis.speak(u); }
+  $('start').classList.add('off');
+  keepAwake();
+  if (!SIM) startGps();
+  if (matchMedia('(pointer:coarse)').matches) goFull();
+});
+window.addEventListener('pagehide', save);
+
+// シミュレーション（?sim=1）：時速60kmで北へ走り、30秒ごとに5秒停車
+const SIM = new URLSearchParams(location.search).has('sim');
+if (SIM) {
+  $('simBadge').style.display = 'block';
+  let lat = 36.3, lon = 139.0, k = 0;
+  setInterval(() => {
+    k++; const stop = (k % 35) >= 30; const v = stop ? 0 : 16.67;
+    lat += v / 111320; R.running = true;
+    onPos(lat, lon, 5, v, Date.now());
+  }, 1000);
+}
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+setInterval(tick, 100);
+tick();
+</script>
+</body>
+</html>
