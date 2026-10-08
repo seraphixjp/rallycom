@@ -204,19 +204,15 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
     </div>
   </section>
 
-  <!-- 記録 -->
-  <section id="view-rec" class="view scroll">
-    <div class="card"><h3>TC</h3><table id="tcTable"></table><div id="penalty" class="note" style="color:var(--warn)"></div></div>
-    <div class="card"><h3>SS（自分の計測・参考）</h3><table id="ssTable"></table></div>
-    <div class="row">
+  <!-- 設定 -->
+  <section id="view-set" class="view scroll">
+    <div class="card"><h3>記録：TC</h3><table id="tcTable"></table><div id="penalty" class="note" style="color:var(--warn)"></div></div>
+    <div class="card"><h3>記録：SS（自分の計測・参考）</h3><table id="ssTable"></table></div>
+    <div class="row" style="margin-bottom:10px">
       <button class="b grow" id="share">記録を送る（LINE・メール等）</button>
       <button class="b badc" id="clearRec" data-long="clearRecords" data-hint="長押しで全消去">全消去（長押し）</button>
     </div>
-  </section>
-
-  <!-- 設定 -->
-  <section id="view-set" class="view scroll">
-    <div class="card">
+      <div class="card">
       <h3>距離の補正係数</h3>
       <span id="factorV" class="num big2" style="color:var(--amber)"></span>
       <div id="calibOn">
@@ -257,16 +253,16 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
         ・次へ（→ / PageDown）・↑ … 距離＋<br>
         ・前へ（← / PageUp）・↓ … 距離−<br>
         ・Enter / スペース … FREEZE<br>
-        Web版では本体の音量キーは使えません。</div>
+        本体の音量キーは、ふつうの音量調整に使えます。</div>
     </div>
     <div class="card">
       <div class="note" id="gpsInfo"></div>
-      <div class="note">ラリコン Web版 0.2.1</div>
+      <div class="note">ラリコン Web版 0.2.2</div>
     </div>
   </section>
 
   <nav id="tabs">
-    <button data-v="drive" class="on">走行</button><button data-v="tc">TC・SS</button><button data-v="rec">記録</button><button data-v="set">設定</button>
+    <button data-v="drive" class="on">走行</button><button data-v="tc">TC・SS</button><button data-v="set">記録・設定</button>
   </nav>
 </div>
 
@@ -593,8 +589,7 @@ document.querySelectorAll('#tabs button').forEach(b => b.addEventListener('click
   document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b));
   document.querySelectorAll('.view').forEach(v => v.classList.toggle('on', v.id === 'view-' + view));
   if (view === 'tc') { fillTcInputs(); }
-  if (view === 'rec') renderRec();
-  if (view === 'set') $('factorIn').value = S.factor.toFixed(5);
+  if (view === 'set') { renderRec(); $('factorIn').value = S.factor.toFixed(5); }
 }));
 
 // ±ボタン：押した瞬間に反応（clickより速い）
@@ -603,7 +598,7 @@ document.querySelectorAll('#tabs button').forEach(b => b.addEventListener('click
 // 長押しボタン共通
 document.querySelectorAll('[data-long]').forEach(b => {
   let h = null, done = false;
-  b.addEventListener('pointerdown', () => { done = false; h = setTimeout(() => { done = true; vib(60); A[b.dataset.long](); if (view === 'rec') renderRec(); }, 700); });
+  b.addEventListener('pointerdown', () => { done = false; h = setTimeout(() => { done = true; vib(60); A[b.dataset.long](); if (view === 'set') renderRec(); }, 700); });
   const cancel = () => clearTimeout(h);
   b.addEventListener('pointerup', cancel); b.addEventListener('pointerleave', cancel); b.addEventListener('pointercancel', cancel);
   b.addEventListener('click', () => { if (!done) toast(b.dataset.hint); });
@@ -655,7 +650,7 @@ on('share', async () => {
   const txt = exportText();
   try { if (navigator.share) await navigator.share({ text: txt }); else { await navigator.clipboard.writeText(txt); toast('コピーしました'); } } catch (e) {}
 });
-$('view-rec').addEventListener('click', e => {
+$('view-set').addEventListener('click', e => {
   const t = e.target.dataset.delTc, s = e.target.dataset.delSs;
   if (t != null) { S.tcRecords.splice(+t, 1); save(); renderRec(); }
   if (s != null) { S.ssRecords.splice(+s, 1); save(); renderRec(); }
@@ -687,8 +682,8 @@ on('fullBtn', goFull);
 document.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT') return;
   const k = e.key;
-  if (['ArrowRight', 'PageDown', 'ArrowUp', '+', '=', 'AudioVolumeUp'].includes(k)) { e.preventDefault(); A.step(+1); }
-  else if (['ArrowLeft', 'PageUp', 'ArrowDown', '-', 'AudioVolumeDown'].includes(k)) { e.preventDefault(); A.step(-1); }
+  if (['ArrowRight', 'PageDown', 'ArrowUp', '+', '='].includes(k)) { e.preventDefault(); A.step(+1); }
+  else if (['ArrowLeft', 'PageUp', 'ArrowDown', '-'].includes(k)) { e.preventDefault(); A.step(-1); }
   else if ((k === 'Enter' || k === ' ') && !e.repeat) { e.preventDefault(); A.freeze(); }
 });
 
