@@ -321,7 +321,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
     </div>
     <div class="card">
       <div class="note" id="gpsInfo"></div>
-      <div class="note" id="verNote">ラリコン Web版 0.5.3</div>
+      <div class="note" id="verNote">ラリコン Web版 0.5.4</div>
     </div>
   </section>
 
@@ -570,7 +570,7 @@ function tick(){
   // TC
   const t = targetMs();
   if (t != null) {
-    if (n >= t - 60000 && n < t - 55000 && zoneCued !== t) { zoneCued = t; beep(880, 300); say('目標の1分前です。ゾーンに入れます'); }
+    if (n >= t - 60000 && n < t - 55000 && zoneCued !== t) { zoneCued = t; beep(880, 300); say('目標の1分前です。ゾーンにはいれます'); }
     if (n >= t && n < t + 5000 && targetCued !== t) { targetCued = t; beep(1200, 400); vib(300); say('目標時刻です'); }
   }
   // GPSロスト
@@ -937,7 +937,7 @@ async function goFull(){
   try { if (!document.fullscreenElement) await document.documentElement.requestFullscreen({ navigationUI:'hide' }); } catch (e) {}
   await lockOrient();
 }
-if (NATIVE) { try { $('verNote').textContent = 'ラリコン アプリ版 ' + NATIVE.version() + '（画面 Web版 0.5.3）'; } catch (e) {} }
+if (NATIVE) { try { $('verNote').textContent = 'ラリコン アプリ版 ' + NATIVE.version() + '（画面 Web版 0.5.4）'; } catch (e) {} }
 // 起動ロゴ：タップで飛ばせる・終わったら消す
 (() => { const sp = $('splash'); const end = () => sp.remove();
   sp.addEventListener('pointerdown', end); setTimeout(end, 2500); })();
