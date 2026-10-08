@@ -321,7 +321,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
     </div>
     <div class="card">
       <div class="note" id="gpsInfo"></div>
-      <div class="note" id="verNote">ラリコン Web版 0.5.2</div>
+      <div class="note" id="verNote">ラリコン Web版 0.5.3</div>
     </div>
   </section>
 
@@ -583,7 +583,7 @@ function tick(){
 const $ = id => document.getElementById(id);
 function tcStatus(n, t){
   if (n < t - 60000) return ['あと ' + mmss(t - n), 'var(--fg)'];
-  if (n < t) return ['ゾーン可 あと ' + mmss(t - n), 'var(--warn)'];
+  if (n < t) return ['ゾーン可 あと ' + mmss(t - n), 'var(--ok)'];   // 目標1分前からSS色
   if (n < t + 60000) return ['今出せば定刻 残' + Math.floor((t + 60000 - n) / 1000) + '秒', 'var(--ok)'];
   return ['遅着 ' + Math.floor((n - t) / 60000) + '分', 'var(--bad)'];
 }
@@ -937,7 +937,7 @@ async function goFull(){
   try { if (!document.fullscreenElement) await document.documentElement.requestFullscreen({ navigationUI:'hide' }); } catch (e) {}
   await lockOrient();
 }
-if (NATIVE) { try { $('verNote').textContent = 'ラリコン アプリ版 ' + NATIVE.version() + '（画面 Web版 0.5.2）'; } catch (e) {} }
+if (NATIVE) { try { $('verNote').textContent = 'ラリコン アプリ版 ' + NATIVE.version() + '（画面 Web版 0.5.3）'; } catch (e) {} }
 // 起動ロゴ：タップで飛ばせる・終わったら消す
 (() => { const sp = $('splash'); const end = () => sp.remove();
   sp.addEventListener('pointerdown', end); setTimeout(end, 2500); })();
