@@ -205,8 +205,8 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
       </div>
       <div id="ctrl">
         <button id="ciBtn"></button>
-        <button id="ciMinus">−1分<small>時刻補正</small></button>
-        <button id="ciPlus">＋1分<small>時刻補正</small></button>
+        <button id="ciMinus">−1分<small>チェックイン</small></button>
+        <button id="ciPlus">＋1分<small>チェックイン</small></button>
       </div>
     </div>
     <button id="rstInter">INTER<br>0</button>
@@ -321,7 +321,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
     </div>
     <div class="card">
       <div class="note" id="gpsInfo"></div>
-      <div class="note" id="verNote">ラリコン Web版 0.5.1</div>
+      <div class="note" id="verNote">ラリコン Web版 0.5.2</div>
     </div>
   </section>
 
@@ -937,7 +937,7 @@ async function goFull(){
   try { if (!document.fullscreenElement) await document.documentElement.requestFullscreen({ navigationUI:'hide' }); } catch (e) {}
   await lockOrient();
 }
-if (NATIVE) { try { $('verNote').textContent = 'ラリコン アプリ版 ' + NATIVE.version() + '（画面 Web版 0.5.1）'; } catch (e) {} }
+if (NATIVE) { try { $('verNote').textContent = 'ラリコン アプリ版 ' + NATIVE.version() + '（画面 Web版 0.5.2）'; } catch (e) {} }
 // 起動ロゴ：タップで飛ばせる・終わったら消す
 (() => { const sp = $('splash'); const end = () => sp.remove();
   sp.addEventListener('pointerdown', end); setTimeout(end, 2500); })();
