@@ -148,6 +148,12 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
 #start{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;text-align:center}
 #start.off{display:none}
 #start button{height:72px;padding:0 32px;font-size:22px;font-weight:800;background:var(--amber);color:#000;border:0}
+/* 起動ロゴ：フェードイン→表示→フェードアウト（タップで飛ばせる） */
+#splash{position:fixed;inset:0;z-index:100;background:#000;display:flex;align-items:center;justify-content:center;
+  animation:splashBg 2.4s ease forwards}
+#splash img{width:min(72vw,520px);height:auto;opacity:0;animation:splashLogo 2.2s ease forwards}
+@keyframes splashLogo{0%{opacity:0;transform:scale(.96)}30%{opacity:1;transform:scale(1)}70%{opacity:1}100%{opacity:0}}
+@keyframes splashBg{0%,90%{opacity:1}100%{opacity:0;visibility:hidden}}
 #toast{position:fixed;left:50%;bottom:70px;transform:translateX(-50%);background:#333;color:#fff;padding:10px 16px;border-radius:8px;font-size:15px;z-index:30;opacity:0;transition:opacity .2s;pointer-events:none}
 #toast.on{opacity:1}
 #simBadge{position:fixed;left:8px;bottom:56px;background:var(--cyan);color:#000;font-size:12px;font-weight:700;padding:2px 6px;border-radius:4px;z-index:5;display:none}
@@ -282,7 +288,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
     </div>
     <div class="card">
       <h3>時計を公式時計に合わせる</h3>
-      <div class="note">Web版は端末の時計を使います。スマホの「日付と時刻を自動設定」をONにしてください。公式時計とずれていたらここで合わせます。</div>
+      <div class="note" id="clockNote">Web版は端末の時計を使います。スマホの「日付と時刻を自動設定」をONにしてください。公式時計とずれていたらここで合わせます。</div>
       <div id="manualV" style="color:var(--amber);font-size:20px"></div>
       <div class="row"><button class="b grow" data-clk="-1000">−1秒</button><button class="b grow" data-clk="-100">−0.1</button><button class="b grow" data-clk="100">+0.1</button><button class="b grow" data-clk="1000">+1秒</button></div>
       <button class="b" id="clk0">手動補正を0に</button>
@@ -292,7 +298,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
       <h3>画面の向き</h3>
       <div class="row" id="orientSel"><button class="b grow" data-o="landscape">横</button><button class="b grow" data-o="portrait">縦</button><button class="b grow" data-o="any">自動回転</button></div>
       <button class="b" id="fullBtn">全画面にして向きを固定</button>
-      <div class="note">画面は自動で消えないようにしています。画面を消したり他のアプリに切り替えると、その間は計測が止まります（戻ったら直線距離で補います）。競技ではアプリ版をおすすめします。</div>
+      <div class="note" id="screenNote">画面は自動で消えないようにしています。画面を消したり他のアプリに切り替えると、その間は計測が止まります（戻ったら直線距離で補います）。競技ではアプリ版をおすすめします。</div>
     </div>
     <div class="card">
       <div class="row"><span class="grow" style="font-size:14px">音声案内</span><button class="sw" id="swVoice"></button></div>
@@ -303,7 +309,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
     </div>
     <div class="card">
       <div class="note" id="gpsInfo"></div>
-      <div class="note">ラリコン Web版 0.4.0</div>
+      <div class="note" id="verNote">ラリコン Web版 0.5.0</div>
     </div>
   </section>
 
@@ -318,6 +324,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
   <div class="note">タップすると、位置情報・音・画面の点灯を有効にします</div>
   <button id="startBtn">計測を開始</button>
 </div>
+<div id="splash"><img src="seraphix-logo.png" alt="SERAPHIX"></div>
 <div id="toast"></div>
 <div id="ssDlg"><div class="dlg">
   <div class="t" id="ssDlgT"></div>
@@ -366,7 +373,9 @@ const totalM = () => S.totalRaw * S.factor + S.totalAdj;
 function interShown(){ const v = S.frozen ? S.frozenInter : interM(); return S.interDown ? S.interTarget - v : v; }
 const totalShown = () => S.frozen ? S.frozenTotal : totalM();
 const targetMs = () => (S.secStart != null && S.secDur > 0) ? S.secStart + S.secDur * 60000 : null;
-const now = () => Date.now() + S.manualOffset;
+// アプリ版の中で動いている時は、GPS・GPS時刻・音声・バイブ・共有・画面の向きをアプリ側に任せる
+const NATIVE = window.RallyNative || null;
+const now = () => Date.now() + (R.gpsOffset || 0) + S.manualOffset;
 
 // ================= 表示フォーマット =================
 const p2 = n => String(n).padStart(2, '0');
@@ -430,7 +439,12 @@ function onPos(lat, lon, acc, speed, t){
   if (Date.now() - lastSave > 2000) save();
 }
 let watchId = null;
+// アプリ版：画面が裏にある間の測位もまとめて届く（時刻つきなので距離は欠けない）
+window.__fixes = arr => { R.running = true; R.gpsErr = ''; arr.forEach(f => onPos(f[0], f[1], f[2], f[3], f[4])); };
+window.__gpsOffset = ms => { R.gpsOffset = ms; };
+window.__gpsError = m => { R.gpsErr = m; };
 function startGps(){
+  if (NATIVE) { NATIVE.startTracking(); return; }
   if (!('geolocation' in navigator)) { R.gpsErr = 'この端末は位置情報に対応していません'; return; }
   if (watchId != null) navigator.geolocation.clearWatch(watchId);
   watchId = navigator.geolocation.watchPosition(
@@ -505,10 +519,12 @@ function beep(freq, ms){
   o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + ms / 1000);
 }
 function say(t){
-  if (!S.voice || !('speechSynthesis' in window)) return;
+  if (!S.voice) return;
+  if (NATIVE) { NATIVE.speak(t); return; }
+  if (!('speechSynthesis' in window)) return;
   speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.lang = 'ja-JP'; u.rate = 1.15; speechSynthesis.speak(u);
 }
-const vib = ms => navigator.vibrate && navigator.vibrate(ms);
+const vib = ms => { if (NATIVE) NATIVE.vibrate(ms); else if (navigator.vibrate) navigator.vibrate(ms); };
 
 // ================= 毎100ms =================
 let lastSsCue = Infinity, zoneCued = 0, targetCued = 0, gpsLostCued = false, stillSince = null;
@@ -576,6 +592,7 @@ function render(n){
   else { gt = 'GPS ±' + Math.round(R.acc) + 'm'; gc = R.acc > 15 ? 'var(--warn)' : 'var(--ok)'; }
   $('gps').innerHTML = `<span style="color:${gc}">● ${gt}</span>` + (S.manualOffset ? `<br><span style="color:var(--dim)">補正 ${(S.manualOffset / 1000).toFixed(1)}秒</span>` : '');
   $('gpsDot').style.color = gc;
+  $('clock').title = R.gpsOffset != null ? 'GPS時刻' : '端末時刻';
 
   // 状況ストリップ
   let L = '区間未設定', Rt = 'TC・SSタブで入力', C = 'var(--dim)';
@@ -662,6 +679,12 @@ function renderTc(n){
 }
 
 function renderSet(){
+  if (NATIVE) {
+    setText('clockNote', R.gpsOffset != null
+      ? `GPS時刻に自動で合わせています（端末の時計との差 ${(R.gpsOffset / 1000).toFixed(2)}秒）。公式時計とずれていたらここで合わせます。`
+      : 'GPS時刻を受信したら自動で合わせます（それまでは端末の時計）。公式時計とずれていたらここで合わせます。');
+    setText('screenNote', 'アプリ版は画面を消しても、他のアプリを開いても計測を続けます。戻ったときにまとめて距離に足します。');
+  }
   setText('factorV', S.factor.toFixed(5));
   $('calibOn').style.display = S.calibActive ? '' : 'none';
   $('calibOff2').style.display = S.calibActive ? 'none' : '';
@@ -787,6 +810,7 @@ on('swSsReset', () => { S.ssResetTrips = !S.ssResetTrips; save(); });
 // 記録
 on('share', async () => {
   const txt = exportText();
+  if (NATIVE) return NATIVE.share(txt);
   try { if (navigator.share) await navigator.share({ text: txt }); else { await navigator.clipboard.writeText(txt); toast('コピーしました'); } } catch (e) {}
 });
 $('view-set').addEventListener('click', e => {
@@ -877,19 +901,25 @@ async function keepAwake(){ try { if ('wakeLock' in navigator) wakeLock = await 
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') keepAwake(); else save(); });
 // 向きの固定は全画面の時だけ効く（ホーム画面に追加したアプリは常に全画面）
 async function lockOrient(){
+  if (NATIVE) { NATIVE.setOrientation(S.orient); return; }
   try { if (S.orient === 'any') screen.orientation.unlock(); else await screen.orientation.lock(S.orient); } catch (e) {}
 }
 async function goFull(){
+  if (NATIVE) return lockOrient();
   try { if (!document.fullscreenElement) await document.documentElement.requestFullscreen({ navigationUI:'hide' }); } catch (e) {}
   await lockOrient();
 }
+if (NATIVE) { try { $('verNote').textContent = 'ラリコン アプリ版 ' + NATIVE.version() + '（画面 Web版 0.5.0）'; } catch (e) {} }
+// 起動ロゴ：タップで飛ばせる・終わったら消す
+(() => { const sp = $('splash'); const end = () => sp.remove();
+  sp.addEventListener('pointerdown', end); setTimeout(end, 2500); })();
 on('startBtn', async () => {
   try { ac = new (window.AudioContext || window.webkitAudioContext)(); await ac.resume(); } catch (e) {}
   if ('speechSynthesis' in window) { const u = new SpeechSynthesisUtterance(''); speechSynthesis.speak(u); }
   $('start').classList.add('off');
   keepAwake();
   if (!SIM) startGps();
-  if (matchMedia('(pointer:coarse)').matches) goFull();
+  if (NATIVE || matchMedia('(pointer:coarse)').matches) goFull();
 });
 window.addEventListener('pagehide', save);
 
@@ -904,7 +934,7 @@ if (SIM) {
     onPos(lat, lon, 5, v, Date.now());
   }, 1000);
 }
-if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+if (!NATIVE && 'serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 setInterval(tick, 100);
