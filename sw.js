@@ -1,5 +1,5 @@
 // 山の中で電波が無くても開けるように、全部キャッシュする（更新時は VERSION を上げる）
-const VERSION = 'rallycom-web-0.3.0';
+const VERSION = 'rallycom-web-0.3.1';
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(VERSION).then(c => c.addAll(FILES))); self.skipWaiting(); });
 self.addEventListener('activate', e => {

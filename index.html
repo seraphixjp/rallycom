@@ -277,7 +277,9 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
     </div>
     <div class="card">
       <h3>画面</h3>
-      <button class="b" id="fullBtn">全画面＋横に固定</button>
+      <h3>画面の向き</h3>
+      <div class="row" id="orientSel"><button class="b grow" data-o="landscape">横</button><button class="b grow" data-o="portrait">縦</button><button class="b grow" data-o="any">自動回転</button></div>
+      <button class="b" id="fullBtn">全画面にして向きを固定</button>
       <div class="note">画面は自動で消えないようにしています。画面を消したり他のアプリに切り替えると、その間は計測が止まります（戻ったら直線距離で補います）。競技ではアプリ版をおすすめします。</div>
     </div>
     <div class="card">
@@ -290,7 +292,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
     </div>
     <div class="card">
       <div class="note" id="gpsInfo"></div>
-      <div class="note">ラリコン Web版 0.3.0</div>
+      <div class="note">ラリコン Web版 0.3.1</div>
     </div>
   </section>
 
@@ -327,6 +329,7 @@ const DEF = {
   tcLabel:'TC1', secStart:null, secDur:0, nextIsSs:false, ssGap:3,
   ssLabel:'SS1', ssStart:null, ssFinish:null, ssResetTrips:true,
   tcRecords:[], ssRecords:[], gapCount:0,
+  orient:'landscape',  // 画面の向き：landscape / portrait / any
   ssAwait:null,   // タイム入力待ちのSS記録の番号
   ssDist:0,       // SS距離(m)。0なら「止まったら終了」で判定
   ssStartTotal:null, // SSスタート時のTOTAL(m)。SS距離はここから数える
@@ -467,7 +470,7 @@ const A = {
   },
   ssSetTime(i, ms){ const r = S.ssRecords[i]; if (!r) return; r.t = ms; if (S.ssAwait === i) S.ssAwait = null; save(); },
   resetRally(){
-    const keep = { factor:S.factor, step:S.step, adjTotal:S.adjTotal, voice:S.voice };
+    const keep = { factor:S.factor, step:S.step, adjTotal:S.adjTotal, voice:S.voice, orient:S.orient };
     S = Object.assign(JSON.parse(JSON.stringify(DEF)), keep);
     R.maxSpeed = 0; R.prev = null; R.prevSpeed = 0; lastSsCue = Infinity; stillSince = null;
     save(); hideUndo(); closeSsDlg(); renderRec(); toast('全部リセットしました');
@@ -645,6 +648,7 @@ function renderSet(){
   document.querySelectorAll('#stepSel button').forEach(b => b.classList.toggle('sel', +b.dataset.v === S.step));
   $('swAdjTotal').classList.toggle('on', S.adjTotal);
   $('swVoice').classList.toggle('on', S.voice);
+  document.querySelectorAll('#orientSel button').forEach(b => b.classList.toggle('sel', b.dataset.o === S.orient));
   setText('manualV', `手動補正：${S.manualOffset >= 0 ? '+' : ''}${(S.manualOffset / 1000).toFixed(1)}秒`);
   setText('gpsInfo', `欠測（トンネル・画面オフ等）：${S.gapCount}回　最高速 ${Math.round(R.maxSpeed)}km/h`);
 }
@@ -793,6 +797,10 @@ document.querySelectorAll('[data-clk]').forEach(b => b.addEventListener('click',
 on('clk0', () => { S.manualOffset = 0; save(); });
 on('swVoice', () => { S.voice = !S.voice; save(); });
 on('fullBtn', goFull);
+document.querySelectorAll('#orientSel button').forEach(b => b.addEventListener('click', () => {
+  S.orient = b.dataset.o; save(); goFull();
+  toast({ landscape:'横に固定', portrait:'縦に固定', any:'自動回転' }[S.orient]);
+}));
 
 // 物理キー（プレゼン用リモコン・キーボード）
 document.addEventListener('keydown', e => {
@@ -807,9 +815,13 @@ document.addEventListener('keydown', e => {
 let wakeLock = null;
 async function keepAwake(){ try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {} }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') keepAwake(); else save(); });
+// 向きの固定は全画面の時だけ効く（ホーム画面に追加したアプリは常に全画面）
+async function lockOrient(){
+  try { if (S.orient === 'any') screen.orientation.unlock(); else await screen.orientation.lock(S.orient); } catch (e) {}
+}
 async function goFull(){
-  try { await document.documentElement.requestFullscreen({ navigationUI:'hide' }); } catch (e) {}
-  try { await screen.orientation.lock('landscape'); } catch (e) {}
+  try { if (!document.fullscreenElement) await document.documentElement.requestFullscreen({ navigationUI:'hide' }); } catch (e) {}
+  await lockOrient();
 }
 on('startBtn', async () => {
   try { ac = new (window.AudioContext || window.webkitAudioContext)(); await ac.resume(); } catch (e) {}
