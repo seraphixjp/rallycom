@@ -31,27 +31,38 @@ button:active{background:#333}
 
 /* ---------- 走行画面 ---------- */
 #view-drive.on{display:grid;gap:6px;padding:6px;
-  grid-template-columns:1fr 1fr;
+  grid-template-columns:2fr 1fr;
   grid-template-rows:auto minmax(0,1fr) auto auto;
-  grid-template-areas:"top top" "nums nums" "minus plus" "ctrl ctrl"}
+  grid-template-areas:"top top" "nums nums" "adj rst" "ctrl ctrl"}
 #center{display:contents}
 #top{grid-area:top;display:flex;flex-direction:column;gap:6px}
 #nums{grid-area:nums;display:flex;flex-direction:column;gap:6px;min-height:0}
 #ctrl{grid-area:ctrl;display:flex;gap:8px}
-#minus{grid-area:minus}#plus{grid-area:plus}
+#adj{grid-area:adj;display:flex;gap:6px}
+#adj .step{flex:1}
 .step{height:84px;font-size:30px;font-weight:800;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
 .step small{font-size:14px;font-weight:400;color:var(--dim);margin-top:4px}
+#rstInter{grid-area:rst;font-size:24px;font-weight:800;line-height:1.05;color:var(--amber);display:flex;flex-direction:column;align-items:center;justify-content:center}
+#rstInter small{font-size:12px;font-weight:400;color:var(--dim);margin-top:6px}
 #ctrl button{flex:1;height:60px;font-size:16px;font-weight:700;line-height:1.15}
-#ctrl small{font-size:11px;font-weight:400;color:var(--dim)}
+#modeBtn.ss{color:#000;background:var(--ok)}
+#modeBtn.li{color:var(--cyan)}
 @media (orientation:landscape){
-  #view-drive.on{grid-template-columns:92px minmax(0,1fr) 92px;grid-template-rows:minmax(0,1fr);grid-template-areas:"minus center plus"}
+  #view-drive.on{grid-template-columns:96px minmax(0,1fr) 104px;grid-template-rows:minmax(0,1fr);grid-template-areas:"adj center rst"}
+  #adj{flex-direction:column}
   #center{display:flex;flex-direction:column;gap:4px;grid-area:center;min-height:0;min-width:0}
   #top{flex-direction:row;align-items:center}
   #nums{flex:1;flex-direction:row}
   #interP{flex:1.6}#totP{flex:1}
   .step{height:auto}
+  #rstInter{font-size:28px}
   #ctrl button{height:44px;font-size:14px}
 }
+#undo{position:fixed;left:50%;bottom:64px;transform:translateX(-50%);z-index:30;display:none;align-items:center;gap:12px;background:#333;border-radius:10px;padding:8px 8px 8px 16px;font-size:15px}
+#undo.on{display:flex}
+@media (orientation:landscape){#undo{bottom:96px}}
+@media (orientation:portrait){#undo{bottom:240px}}
+#undo button{height:44px;padding:0 16px;font-weight:800;background:var(--amber);color:#000;border:0}
 .panel{background:var(--panel);border-radius:10px;padding:4px 10px;display:flex;flex-direction:column;min-height:0;min-width:0}
 #interP{flex:1}
 .lab{font-size:13px;color:var(--dim);display:flex;align-items:center;gap:6px}
@@ -115,7 +126,10 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
 <div id="app">
   <!-- 走行 -->
   <main id="view-drive" class="view on">
-    <button id="minus" class="step" data-step="-1">−<small id="stepL1">10m</small></button>
+    <div id="adj">
+      <button id="plus" class="step" data-step="1">＋<small id="stepL2">10m</small></button>
+      <button id="minus" class="step" data-step="-1">−<small id="stepL1">10m</small></button>
+    </div>
     <div id="center">
       <div id="top">
         <div id="clockRow">
@@ -142,12 +156,12 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
         </div>
       </div>
       <div id="ctrl">
-        <button id="rstInter" data-long="resetInter" data-hint="誤操作防止のため長押しでリセット">INTER 0<br><small>長押し</small></button>
+        <button id="modeBtn"></button>
         <button id="freeze">FREEZE</button>
         <button id="lockBtn">ロック</button>
       </div>
     </div>
-    <button id="plus" class="step" data-step="1">＋<small id="stepL2">10m</small></button>
+    <button id="rstInter">INTER<br>0<small id="rstHint"></small></button>
   </main>
 
   <!-- TC・SS -->
@@ -250,7 +264,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
     </div>
     <div class="card">
       <div class="note" id="gpsInfo"></div>
-      <div class="note">ラリコン Web版 0.1.0</div>
+      <div class="note">ラリコン Web版 0.2.0</div>
     </div>
   </section>
 
@@ -266,6 +280,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
   <button id="startBtn">計測を開始</button>
 </div>
 <div id="toast"></div>
+<div id="undo"><span>INTERを0にしました</span><button id="undoBtn">元に戻す</button></div>
 <div id="simBadge">シミュレーション</div>
 
 <script>
@@ -280,6 +295,7 @@ const DEF = {
   tcLabel:'TC1', secStart:null, secDur:0, nextIsSs:false, ssGap:3,
   ssLabel:'SS1', ssStart:null, ssFinish:null, ssResetTrips:true,
   tcRecords:[], ssRecords:[], gapCount:0,
+  mode:'liaison',   // 'liaison'＝INTER 0は1タップ（元に戻せる） / 'ss'＝長押し
 };
 let S = Object.assign({}, DEF);
 try { Object.assign(S, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
@@ -378,7 +394,17 @@ const A = {
     S.frozenInter += S.interDown ? -d : d;
     save(); flash(sign > 0 ? 'plus' : 'minus');
   },
-  resetInter(){ S.interRaw = 0; S.interAdj = 0; S.frozen = false; save(); toast('INTERを0にしました'); },
+  resetInter(){
+    undoSnap = { interRaw:S.interRaw, interAdj:S.interAdj, frozen:S.frozen, frozenInter:S.frozenInter, interDown:S.interDown, interTarget:S.interTarget };
+    S.interRaw = 0; S.interAdj = 0; S.frozen = false; save(); vib(40); showUndo();
+  },
+  undo(){
+    if (!undoSnap) return;
+    // 戻すまでに走った距離は捨てずに足す
+    const ranRaw = S.interRaw;
+    Object.assign(S, undoSnap); S.interRaw += ranRaw; undoSnap = null; save(); hideUndo(); toast('元に戻しました');
+  },
+  setMode(m){ S.mode = m; save(); },
   resetTotal(){ Object.assign(S, { totalRaw:0, totalAdj:0, interRaw:0, interAdj:0, frozen:false, gapCount:0 }); R.maxSpeed = 0; save(); toast('全部0にしました'); },
   freeze(){ if (S.frozen) S.frozen = false; else { S.frozen = true; S.frozenInter = interM(); S.frozenTotal = totalM(); } save(); },
   setInterTo(m){ const want = S.interDown ? S.interTarget - m : m; S.interAdj = want - S.interRaw * S.factor; S.frozen = false; save(); },
@@ -400,7 +426,8 @@ const A = {
   ssFinish(){
     if (S.ssStart == null) return; const n = now(); if (n <= S.ssStart) return;
     const fin = Math.floor(n / 100) * 100;
-    S.ssFinish = fin; S.ssRecords.push({ l:S.ssLabel, s:S.ssStart, f:fin }); S.ssLabel = nextLabel(S.ssLabel); save();
+    S.ssFinish = fin; S.ssRecords.push({ l:S.ssLabel, s:S.ssStart, f:fin }); S.ssLabel = nextLabel(S.ssLabel);
+    S.mode = 'liaison'; save(); toast('リエゾンに切り替えました');
   },
   clearRecords(){ S.tcRecords = []; S.ssRecords = []; save(); toast('記録を消しました'); },
 };
@@ -431,7 +458,9 @@ function tick(){
       if (sec <= 5) { beep(1000, 150); vib(80); } else { beep(880, 200); say(sec + '秒前'); }
     } else if (remain <= 0 && remain > -1500 && lastSsCue !== 0) {
       lastSsCue = 0; beep(1400, 900); vib(600);
-      if (S.ssResetTrips) { S.interRaw = 0; S.interAdj = 0; S.frozen = false; S.interDown = false; save(); }
+      S.mode = 'ss';
+      if (S.ssResetTrips) { S.interRaw = 0; S.interAdj = 0; S.frozen = false; S.interDown = false; }
+      save();
     } else if (remain > 31000) lastSsCue = Infinity;
   }
   // TC
@@ -494,6 +523,9 @@ function render(n){
   setText('interLab', S.interDown ? 'INTER ▼ 残り km' : 'INTER km');
   $('badges').innerHTML = (S.frozen ? '<span class="badge">FREEZE</span>' : '') + (S.calibActive ? ' <span class="badge c">校正中</span>' : '');
   setText('stepL1', S.step + 'm'); setText('stepL2', S.step + 'm');
+  const ss = S.mode === 'ss';
+  setText('modeBtn', ss ? 'SS中' : 'リエゾン'); $('modeBtn').className = ss ? 'ss' : 'li';
+  setText('rstHint', ss ? '長押し' : 'タップ');
   setText('freeze', S.frozen ? '解除' : 'FREEZE'); $('freeze').style.color = S.frozen ? 'var(--warn)' : '';
 
   if (view === 'tc') renderTc(n);
@@ -585,6 +617,22 @@ document.querySelectorAll('[data-long]').forEach(b => {
   b.addEventListener('pointerup', cancel); b.addEventListener('pointerleave', cancel); b.addEventListener('pointercancel', cancel);
   b.addEventListener('click', () => { if (!done) toast(b.dataset.hint); });
 });
+// INTER 0：リエゾンは1タップ（5秒間「元に戻す」）、SSは長押し
+let undoSnap = null, undoTimer = null;
+function showUndo(){ $('undo').classList.add('on'); clearTimeout(undoTimer); undoTimer = setTimeout(hideUndo, 5000); }
+function hideUndo(){ $('undo').classList.remove('on'); undoSnap = null; }
+on('undoBtn', () => A.undo());
+(() => {
+  const b = $('rstInter'); let h = null, done = false;
+  b.addEventListener('pointerdown', e => {
+    e.preventDefault(); done = false;
+    if (S.mode !== 'ss') { done = true; A.resetInter(); flash('rstInter'); return; }
+    h = setTimeout(() => { done = true; A.resetInter(); }, 700);
+  });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => b.addEventListener(ev, () => clearTimeout(h)));
+  b.addEventListener('click', () => { if (!done) toast('SS中は誤操作防止のため長押しでリセット'); });
+})();
+on('modeBtn', () => { A.setMode(S.mode === 'ss' ? 'liaison' : 'ss'); toast(S.mode === 'ss' ? 'SS：INTER 0は長押し' : 'リエゾン：INTER 0は1タップ'); });
 on('freeze', () => A.freeze());
 on('lockBtn', () => { R.locked = true; $('lock').classList.add('on'); });
 (() => { let h; const u = $('unlock');
