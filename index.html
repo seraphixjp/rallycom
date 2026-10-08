@@ -110,14 +110,20 @@ button:active{background:#333}
 .b.sel{background:var(--amber);color:#000}
 .b.big{height:60px;font-size:19px;width:100%}
 .b.okc{color:var(--ok)}.b.badc{color:var(--bad)}
-input[type=number],input[type=text]{background:#000;color:#fff;border:1px solid var(--line);border-radius:8px;height:44px;font-size:22px;padding:0 8px;font-family:var(--num);width:72px}
-input.w{width:120px}
+input[type=number],input[type=text]{background:#000;color:#fff;border:2px solid var(--line);border-radius:10px;height:60px;font-size:30px;font-weight:700;padding:0 8px;font-family:var(--num);width:82px;text-align:center}
+input.w{width:150px}
+input::placeholder{color:#555;font-weight:400}
 input:focus{outline:none;border-color:var(--amber)}
 .note{font-size:13px;color:var(--dim);line-height:1.5}
 .big1{font-size:40px}.big2{font-size:28px}.big3{font-size:56px}
-.sw{position:relative;width:52px;height:30px;border-radius:15px;background:#444;border:0;flex:0 0 auto}
-.sw::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:12px;background:#ddd;transition:left .15s}
-.sw.on{background:var(--amber)}.sw.on::after{left:25px;background:#000}
+.sw{position:relative;width:64px;height:36px;border-radius:18px;background:#444;border:0;flex:0 0 auto}
+.sw::after{content:"";position:absolute;top:4px;left:4px;width:28px;height:28px;border-radius:14px;background:#ddd;transition:left .15s}
+.sw.on{background:var(--amber)}.sw.on::after{left:32px;background:#000}
+/* 大きいON/OFFボタン */
+.tog{height:72px;width:100%;font-size:19px;font-weight:800;line-height:1.25;background:#262626;border:2px solid var(--line)}
+.tog small{display:block;font-size:13px;font-weight:400;color:var(--dim)}
+.tog.on{background:var(--ok);color:#000;border-color:var(--ok)}
+.tog.on small{color:#063}
 table{width:100%;border-collapse:collapse;font-size:15px}
 td{padding:6px 4px;border-bottom:1px solid var(--line)}
 
@@ -179,8 +185,8 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
     <div class="card">
       <div class="row"><h3>次のTC</h3><input type="text" id="tcLabel" class="w"></div>
       <div id="tcInfo"></div>
+      <div class="note">区間スタート（時:分）＋ 目標所要時間（分）</div>
       <div class="row">
-        <span class="note">スタート</span>
         <input type="number" id="secH" min="0" max="23" inputmode="numeric"> :
         <input type="number" id="secM" min="0" max="59" inputmode="numeric"> ＋
         <input type="number" id="secD" min="0" inputmode="numeric"> <span class="note">分</span>
@@ -189,7 +195,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
         <button class="b grow" id="setSection">目標を設定</button>
         <button class="b grow" id="nowStart">今をスタートに</button>
       </div>
-      <div class="row"><span class="grow" id="nextSsLab" style="font-size:14px"></span><button class="sw" id="swNextSs"></button></div>
+      <button class="tog" id="swNextSs"></button>
       <div class="row" id="gapRow"><span class="note">間隔</span><button class="b" id="gapM">−1分</button><b id="gapV"></b><button class="b" id="gapP">＋1分</button></div>
       <h3>チェックイン（カードに書かれた時刻）</h3>
       <div class="row">
@@ -282,7 +288,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
     </div>
     <div class="card">
       <div class="note" id="gpsInfo"></div>
-      <div class="note">ラリコン Web版 0.3.4</div>
+      <div class="note">ラリコン Web版 0.3.5</div>
     </div>
   </section>
 
@@ -607,7 +613,8 @@ function renderTc(n){
     const [m, c] = tcStatus(n, t);
     $('tcInfo').innerHTML = `<div class="num big1">目標 ${hm(t)}</div><div class="num big2" style="color:${c}">${m}</div><div class="note">区間スタート ${hm(S.secStart)} ＋ ${S.secDur}分</div>`;
   } else $('tcInfo').innerHTML = '<div class="note">区間スタート時刻と目標所要時間（分）を入れてください。チェックインやSSスタートを記録すると、スタート時刻は自動で入ります</div>';
-  setText('nextSsLab', `このTCの次はSS（チェックイン＋${S.ssGap}分でスタート）`);
+  const ns = S.nextIsSs ? `次はSS：ON<small>チェックイン＋${S.ssGap}分でSSスタート</small>` : `次はSS：OFF<small>タップでON（このTCの次がSSのとき）</small>`;
+  if ($('swNextSs').innerHTML !== ns) $('swNextSs').innerHTML = ns;
   $('swNextSs').classList.toggle('on', S.nextIsSs);
   $('gapRow').style.display = S.nextIsSs ? '' : 'none'; setText('gapV', S.ssGap + '分');
   const a = ciActual(); setText('ciV', hm(a));
@@ -675,7 +682,7 @@ document.querySelectorAll('#tabs button').forEach(b => b.addEventListener('click
   view = b.dataset.v;
   document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b));
   document.querySelectorAll('.view').forEach(v => v.classList.toggle('on', v.id === 'view-' + view));
-  if (view === 'tc') { fillTcInputs(); }
+  if (view === 'tc') { fillTcInputs(); renderTc(now()); }
   if (view === 'set') { renderRec(); $('factorIn').value = S.factor.toFixed(5); }
 }));
 
