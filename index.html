@@ -113,6 +113,21 @@ button:active{background:#333}
 input[type=number],input[type=text]{background:#000;color:#fff;border:2px solid var(--line);border-radius:10px;height:60px;font-size:30px;font-weight:700;padding:0 8px;font-family:var(--num);width:82px;text-align:center}
 input.w{width:150px}
 input::placeholder{color:#555;font-weight:400}
+input.kp{caret-color:transparent;cursor:pointer}
+input.kp.kpf{border-color:var(--amber);background:#1a1400}
+/* 自前テンキー：縦は下から、横は右から */
+#kp{position:fixed;z-index:60;background:#0d0d0d;display:none;gap:6px;padding:8px;
+  grid-template-columns:repeat(3,1fr);grid-auto-rows:1fr}
+#kp.on{display:grid}
+#kp button{font-size:30px;font-weight:800;border-radius:10px;background:#222;min-height:0}
+#kp button.fn{font-size:18px}
+#kp button.ok{background:var(--amber);color:#000}
+@media (orientation:portrait){#kp{left:0;right:0;bottom:0;height:44vh;border-top:2px solid var(--line)}
+  body.kpopen .scroll{padding-bottom:46vh}
+  body.kpopen #ssDlg{align-items:flex-start;padding-top:20px}}
+@media (orientation:landscape){#kp{top:0;bottom:0;right:0;width:300px;border-left:2px solid var(--line)}
+  body.kpopen .scroll{padding-right:312px}
+  body.kpopen #ssDlg{padding-right:312px}}
 input:focus{outline:none;border-color:var(--amber)}
 .note{font-size:13px;color:var(--dim);line-height:1.5}
 .big1{font-size:40px}.big2{font-size:28px}.big3{font-size:56px}
@@ -187,9 +202,9 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
       <div id="tcInfo"></div>
       <div class="note">区間スタート（時:分）＋ 目標所要時間（分）</div>
       <div class="row">
-        <input type="number" id="secH" min="0" max="23" inputmode="numeric"> :
-        <input type="number" id="secM" min="0" max="59" inputmode="numeric"> ＋
-        <input type="number" id="secD" min="0" inputmode="numeric"> <span class="note">分</span>
+        <input class="kp" type="text" id="secH" readonly data-len="2"> :
+        <input class="kp" type="text" id="secM" readonly data-len="2"> ＋
+        <input class="kp" type="text" id="secD" readonly> <span class="note">分</span>
       </div>
       <div class="row">
         <button class="b grow" id="setSection">目標を設定</button>
@@ -213,14 +228,14 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
       <button class="b big okc" id="ssTimeBtn" style="display:none">SSタイムを入力</button>
       <div class="row">
         <span class="note">スタート時刻</span>
-        <input type="number" id="ssH" min="0" max="23" inputmode="numeric"> :
-        <input type="number" id="ssMi" min="0" max="59" inputmode="numeric">
+        <input class="kp" type="text" id="ssH" readonly data-len="2"> :
+        <input class="kp" type="text" id="ssMi" readonly data-len="2">
         <button class="b" id="ssSet">設定</button>
         <button class="b" id="ssClear">取消</button>
       </div>
       <div class="row">
         <span class="note">SS距離</span>
-        <input type="number" id="ssDistIn" class="w" step="0.01" inputmode="decimal"><span class="note">km</span>
+        <input type="text" id="ssDistIn" class="kp w" readonly data-dec="1"><span class="note">km</span>
         <button class="b" id="ssDistSet">設定</button>
         <span class="grow note" id="ssDistV"></span>
       </div>
@@ -242,12 +257,12 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
       <span id="factorV" class="num big2" style="color:var(--amber)"></span>
       <div id="calibOn">
         <div id="calibRaw" style="color:var(--cyan);font-size:18px"></div>
-        <div class="row"><span class="note">公式距離</span><input type="number" id="calibOff" class="w" step="0.01" inputmode="decimal"><span class="note">km</span><button class="b" id="calibOk">確定</button><button class="b" id="calibCancel">中止</button></div>
+        <div class="row"><span class="note">公式距離</span><input type="text" id="calibOff" class="kp w" readonly data-dec="1"><span class="note">km</span><button class="b" id="calibOk">確定</button><button class="b" id="calibCancel">中止</button></div>
       </div>
       <div id="calibOff2">
         <div class="note">ロードブックの「トリップメーター補正」区間の始点で開始→終点で公式距離を入れます。前回の係数を信用せず、毎回やり直すのがおすすめです。</div>
         <button class="b" id="calibStart">オドチェック開始（始点で押す）</button>
-        <div class="row"><span class="note">手入力</span><input type="number" id="factorIn" class="w" step="0.00001" inputmode="decimal"><button class="b" id="factorSet">反映</button><button class="b" id="factor1">1.0</button></div>
+        <div class="row"><span class="note">手入力</span><input type="text" id="factorIn" class="kp w" readonly data-dec="1"><button class="b" id="factorSet">反映</button><button class="b" id="factor1">1.0</button></div>
       </div>
     </div>
     <div class="card">
@@ -255,9 +270,9 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
       <div class="row" id="stepSel"><button class="b grow" data-v="10">10m</button><button class="b grow" data-v="50">50m</button><button class="b grow" data-v="100">100m</button></div>
       <div class="row"><span class="grow" style="font-size:14px">±をTOTALにも反映</span><button class="sw" id="swAdjTotal"></button></div>
       <h3>距離を直接合わせる（コマ図の距離に）</h3>
-      <div class="row"><input type="number" id="setTo" class="w" step="0.01" inputmode="decimal"><span class="note">km</span><button class="b" id="setInter">INTERに</button><button class="b" id="setTotal">TOTALに</button></div>
+      <div class="row"><input type="text" id="setTo" class="kp w" readonly data-dec="1"><span class="note">km</span><button class="b" id="setInter">INTERに</button><button class="b" id="setTotal">TOTALに</button></div>
       <h3>INTERの減算モード（次のコマまでの距離→0に向かって減る）</h3>
-      <div class="row"><input type="number" id="downTo" class="w" step="0.01" inputmode="decimal"><span class="note">km</span><button class="b" id="downStart">減算開始</button><button class="b" id="downEnd">解除</button></div>
+      <div class="row"><input type="text" id="downTo" class="kp w" readonly data-dec="1"><span class="note">km</span><button class="b" id="downStart">減算開始</button><button class="b" id="downEnd">解除</button></div>
       <button class="b badc" id="resetAll" data-long="resetTotal" data-hint="長押しでリセット">TOTAL・INTERを全部0（長押し）</button>
     </div>
     <div class="card">
@@ -288,7 +303,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
     </div>
     <div class="card">
       <div class="note" id="gpsInfo"></div>
-      <div class="note">ラリコン Web版 0.3.5</div>
+      <div class="note">ラリコン Web版 0.4.0</div>
     </div>
   </section>
 
@@ -306,10 +321,17 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
 <div id="toast"></div>
 <div id="ssDlg"><div class="dlg">
   <div class="t" id="ssDlgT"></div>
-  <div class="row"><input type="number" id="tM" inputmode="numeric" placeholder="分"><b>:</b><input type="number" id="tS" inputmode="numeric" placeholder="秒"><b>.</b><input type="number" id="tT" inputmode="numeric" placeholder="0"></div>
+  <div class="row"><input class="kp" type="text" id="tM" placeholder="分" readonly data-len="2"><b>:</b><input class="kp" type="text" id="tS" placeholder="秒" readonly data-len="2"><b>.</b><input class="kp" type="text" id="tT" placeholder="0" readonly data-len="1"></div>
   <div class="note" id="ssDlgEst"></div>
   <div class="row"><button class="b grow" id="ssDlgLater">あとで</button><button class="b grow okc" id="ssDlgOk" style="height:56px;font-size:18px">記録</button></div>
 </div></div>
+<div id="kp">
+  <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
+  <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
+  <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
+  <button data-k="." id="kpDot">.</button><button data-k="0">0</button><button data-k="bs" class="fn">⌫</button>
+  <button data-k="next" class="fn">次へ</button><button data-k="done" class="fn ok" style="grid-column:span 2">完了</button>
+</div>
 <div id="undo"><span>INTERを0にしました</span><button id="undoBtn">元に戻す</button></div>
 <div id="simBadge">シミュレーション</div>
 
@@ -749,9 +771,9 @@ function openSsDlg(i){
   setText('ssDlgEst', `目安タイム：${stageTime(r.f - r.s)}（${r.by === 'dist' ? 'SS距離で判定' : '止まった時点'}）`);
   if (r.t != null) { const t = Math.round(r.t / 100); $('tM').value = Math.floor(t / 600); $('tS').value = Math.floor((t % 600) / 10); $('tT').value = t % 10; }
   else { $('tM').value = ''; $('tS').value = ''; $('tT').value = ''; }
-  $('ssDlg').classList.add('on'); setTimeout(() => $('tM').focus(), 50);
+  $('ssDlg').classList.add('on'); openKp($('tM'));
 }
-function closeSsDlg(){ $('ssDlg').classList.remove('on'); dlgIdx = null; }
+function closeSsDlg(){ $('ssDlg').classList.remove('on'); dlgIdx = null; closeKp(); }
 on('ssBox', () => { if (S.ssAwait != null) openSsDlg(S.ssAwait); });
 on('ssTimeBtn', () => { if (S.ssAwait != null) openSsDlg(S.ssAwait); });
 on('ssDlgLater', closeSsDlg);
@@ -808,6 +830,46 @@ document.addEventListener('keydown', e => {
   else if (['ArrowLeft', 'PageUp', 'ArrowDown', '-'].includes(k)) { e.preventDefault(); A.step(-1); }
 
 });
+
+// ================= 自前テンキー =================
+// スマホのキーボードは入力欄を隠すので使わない。最初の1キーで前の値を消して打ち直し
+let kpEl = null;
+function openKp(el){
+  if (kpEl) kpEl.classList.remove('kpf');
+  kpEl = el; el.classList.add('kpf'); el.dataset.fresh = '1';
+  $('kpDot').style.visibility = el.dataset.dec ? '' : 'hidden';
+  $('kp').classList.add('on'); document.body.classList.add('kpopen');
+  setTimeout(() => el.scrollIntoView({ block:'center', behavior:'smooth' }), 30);
+}
+function closeKp(){
+  if (kpEl) kpEl.classList.remove('kpf');
+  kpEl = null; $('kp').classList.remove('on'); document.body.classList.remove('kpopen');
+}
+function kpNext(){
+  if (!kpEl) return;
+  const scope = kpEl.closest('.row')?.parentElement || document;
+  const all = [...scope.querySelectorAll('input.kp')].filter(e => e.offsetParent);
+  const i = all.indexOf(kpEl);
+  if (i >= 0 && i < all.length - 1) openKp(all[i + 1]); else closeKp();
+}
+function kpKey(k){
+  const el = kpEl; if (!el) return;
+  if (k === 'done') return closeKp();
+  if (k === 'next') return kpNext();
+  if (k === 'bs') { el.dataset.fresh = ''; el.value = el.value.slice(0, -1); return; }
+  if (el.dataset.fresh) { el.value = ''; el.dataset.fresh = ''; }
+  if (k === '.' && (!el.dataset.dec || el.value.includes('.'))) return;
+  const len = +el.dataset.len || 0;
+  if (len && el.value.length >= len) return;
+  el.value += k;
+  if (len && el.value.length >= len) kpNext();   // 時・分は2桁で次の欄へ
+}
+document.querySelectorAll('input.kp').forEach(el => el.addEventListener('pointerdown', e => { e.preventDefault(); openKp(el); }));
+document.querySelectorAll('#kp button').forEach(b => b.addEventListener('pointerdown', e => { e.preventDefault(); vib(15); kpKey(b.dataset.k); }));
+// テンキーと入力欄以外を触ったら閉じる（ボタンの動作はそのまま）
+document.addEventListener('pointerdown', e => {
+  if (kpEl && !e.target.closest('#kp') && !e.target.closest('input.kp')) closeKp();
+}, true);
 
 // ================= 起動 =================
 let wakeLock = null;
