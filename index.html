@@ -59,6 +59,19 @@ button:active{background:#333}
 }
 #undo{position:fixed;left:50%;bottom:64px;transform:translateX(-50%);z-index:30;display:none;align-items:center;gap:12px;background:#333;border-radius:10px;padding:8px 8px 8px 16px;font-size:15px}
 #undo.on{display:flex}
+/* SS枠（INTERとTOTALの間） */
+#ssBox{display:none;flex:1.4 1 0;border:2px solid var(--line);text-align:left}
+#ssBox.on{display:flex}
+#ssBox.run{border-color:var(--ok)}
+#ssBox.await{border-color:var(--amber);cursor:pointer}
+#ssBoxV{--ch:6}
+@media (orientation:portrait){#ssBox{flex:0 0 120px}}
+/* SSタイム入力 */
+#ssDlg{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;padding:16px}
+#ssDlg.on{display:flex}
+#ssDlg .dlg{background:var(--panel);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px;max-width:520px;width:100%}
+#ssDlg input{width:78px;font-size:30px;height:56px;text-align:center}
+#ssDlg .t{font-size:20px;font-weight:800}
 /* SS走行中はINTERまわりをSSカラー（緑）に */
 #view-drive.ssrun #inter,#view-drive.ssrun #rstInter{color:var(--ok)}
 #view-drive.ssrun #inter.neg{color:var(--bad)}
@@ -146,6 +159,10 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
           <div class="lab"><span id="interLab">INTER km</span><span class="sp"></span><span id="badges"></span></div>
           <div class="fit"><span id="inter" class="num">0.00</span></div>
         </div>
+        <div class="panel" id="ssBox">
+          <div class="lab" id="ssBoxLab"></div>
+          <div class="fit"><span id="ssBoxV" class="num"></span></div>
+        </div>
         <div class="panel" id="totP">
           <div style="display:flex;flex-direction:column;flex:1.4;min-height:0;min-width:0">
             <div class="lab">TOTAL km</div>
@@ -195,7 +212,8 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
     <div class="card">
       <div class="row"><h3>SS</h3><input type="text" id="ssLabel" class="w"></div>
       <div id="ssInfo"></div>
-      <button class="b big okc" id="ssFin" style="display:none;height:72px">FINISH（フィニッシュ通過）</button>
+      <button class="b big" id="ssFin" style="display:none">SSを手動で終了（ふつうは止まると自動で終了）</button>
+      <button class="b big okc" id="ssTimeBtn" style="display:none">SSタイムを入力</button>
       <div class="row">
         <span class="note">スタート時刻</span>
         <input type="number" id="ssH" min="0" max="23" inputmode="numeric"> :
@@ -203,15 +221,21 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
         <button class="b" id="ssSet">設定</button>
         <button class="b" id="ssClear">取消</button>
       </div>
+      <div class="row">
+        <span class="note">SS距離</span>
+        <input type="number" id="ssDistIn" class="w" step="0.01" inputmode="decimal"><span class="note">km</span>
+        <button class="b" id="ssDistSet">設定</button>
+        <span class="grow note" id="ssDistV"></span>
+      </div>
       <div class="row"><span class="grow" style="font-size:14px">スタートでINTERを0にする</span><button class="sw" id="swSsReset"></button></div>
-      <div class="note">30・15・10秒前は音声、5秒前から毎秒ビープでお知らせします</div>
+      <div class="note">30・15・10秒前は音声、5秒前から毎秒ビープでお知らせします。SS距離を入れておくと、その距離を走った時点で自動で終了し、目安タイムを記録します（入れていない時は、1分以上走ってから8秒止まったら終了）。正確なタイムはストップで言われたものを入力してください。</div>
     </div>
   </section>
 
   <!-- 設定 -->
   <section id="view-set" class="view scroll">
     <div class="card"><h3>記録：TC</h3><table id="tcTable"></table><div id="penalty" class="note" style="color:var(--warn)"></div></div>
-    <div class="card"><h3>記録：SS（自分の計測・参考）</h3><table id="ssTable"></table></div>
+    <div class="card"><h3>記録：SS</h3><table id="ssTable"></table></div>
     <div class="row" style="margin-bottom:10px">
       <button class="b grow" id="share">記録を送る（LINE・メール等）</button>
       <button class="b badc" id="clearRec" data-long="clearRecords" data-hint="長押しで全消去">全消去（長押し）</button>
@@ -240,6 +264,11 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
       <button class="b badc" id="resetAll" data-long="resetTotal" data-hint="長押しでリセット">TOTAL・INTERを全部0（長押し）</button>
     </div>
     <div class="card">
+      <h3>ラリーが終わったら</h3>
+      <div class="note">距離・TC・SS・記録・時計の手動補正を消して、最初の状態に戻します。補正係数・±の単位・音声のオン/オフは残します。記録が必要なら先に「記録を送る」で保存してください。</div>
+      <button class="b badc" data-long="resetRally" data-hint="長押しで全部リセット">ラリー終了：全部リセット（長押し）</button>
+    </div>
+    <div class="card">
       <h3>時計を公式時計に合わせる</h3>
       <div class="note">Web版は端末の時計を使います。スマホの「日付と時刻を自動設定」をONにしてください。公式時計とずれていたらここで合わせます。</div>
       <div id="manualV" style="color:var(--amber);font-size:20px"></div>
@@ -261,7 +290,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
     </div>
     <div class="card">
       <div class="note" id="gpsInfo"></div>
-      <div class="note">ラリコン Web版 0.2.4</div>
+      <div class="note">ラリコン Web版 0.3.0</div>
     </div>
   </section>
 
@@ -277,6 +306,12 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
   <button id="startBtn">計測を開始</button>
 </div>
 <div id="toast"></div>
+<div id="ssDlg"><div class="dlg">
+  <div class="t" id="ssDlgT"></div>
+  <div class="row"><input type="number" id="tM" inputmode="numeric" placeholder="分"><b>:</b><input type="number" id="tS" inputmode="numeric" placeholder="秒"><b>.</b><input type="number" id="tT" inputmode="numeric" placeholder="0"></div>
+  <div class="note" id="ssDlgEst"></div>
+  <div class="row"><button class="b grow" id="ssDlgLater">あとで</button><button class="b grow okc" id="ssDlgOk" style="height:56px;font-size:18px">記録</button></div>
+</div></div>
 <div id="undo"><span>INTERを0にしました</span><button id="undoBtn">元に戻す</button></div>
 <div id="simBadge">シミュレーション</div>
 
@@ -292,8 +327,11 @@ const DEF = {
   tcLabel:'TC1', secStart:null, secDur:0, nextIsSs:false, ssGap:3,
   ssLabel:'SS1', ssStart:null, ssFinish:null, ssResetTrips:true,
   tcRecords:[], ssRecords:[], gapCount:0,
+  ssAwait:null,   // タイム入力待ちのSS記録の番号
+  ssDist:0,       // SS距離(m)。0なら「止まったら終了」で判定
+  ssStartTotal:null, // SSスタート時のTOTAL(m)。SS距離はここから数える
 };
-let S = Object.assign({}, DEF);
+let S = JSON.parse(JSON.stringify(DEF));   // DEFの配列を共有しないようにコピー
 try { Object.assign(S, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
 S.frozen = S.frozen || false;
 let lastSave = 0;
@@ -418,11 +456,21 @@ const A = {
     ciOverride = null; save();
     toast(`${S.tcRecords.at(-1).l} ${hm(actual)} を記録`);
   },
-  ssFinish(){
-    if (S.ssStart == null) return; const n = now(); if (n <= S.ssStart) return;
+  // SS終了（ストップで止まったら自動）。タイムは主催者に言われたものを後で入力
+  ssFinish(at){
+    if (S.ssStart == null || S.ssFinish != null) return; const n = at ?? now(); if (n <= S.ssStart) return;
     const fin = Math.floor(n / 100) * 100;
-    S.ssFinish = fin; S.ssRecords.push({ l:S.ssLabel, s:S.ssStart, f:fin }); S.ssLabel = nextLabel(S.ssLabel);
-    save();
+    S.ssFinish = fin; S.ssRecords.push({ l:S.ssLabel, s:S.ssStart, f:fin, t:null, by:S.ssDist > 0 ? 'dist' : 'stop' });
+    S.ssDist = 0; S.ssStartTotal = null;
+    S.ssAwait = S.ssRecords.length - 1; S.ssLabel = nextLabel(S.ssLabel);
+    save(); beep(880, 300); vib(300); say('SS終了。タイムを入力してください');
+  },
+  ssSetTime(i, ms){ const r = S.ssRecords[i]; if (!r) return; r.t = ms; if (S.ssAwait === i) S.ssAwait = null; save(); },
+  resetRally(){
+    const keep = { factor:S.factor, step:S.step, adjTotal:S.adjTotal, voice:S.voice };
+    S = Object.assign(JSON.parse(JSON.stringify(DEF)), keep);
+    R.maxSpeed = 0; R.prev = null; R.prevSpeed = 0; lastSsCue = Infinity; stillSince = null;
+    save(); hideUndo(); closeSsDlg(); renderRec(); toast('全部リセットしました');
   },
   clearRecords(){ S.tcRecords = []; S.ssRecords = []; save(); toast('記録を消しました'); },
 };
@@ -442,7 +490,7 @@ function say(t){
 const vib = ms => navigator.vibrate && navigator.vibrate(ms);
 
 // ================= 毎100ms =================
-let lastSsCue = Infinity, zoneCued = 0, targetCued = 0, gpsLostCued = false;
+let lastSsCue = Infinity, zoneCued = 0, targetCued = 0, gpsLostCued = false, stillSince = null;
 function tick(){
   const n = now();
   // SSカウントダウン
@@ -453,9 +501,21 @@ function tick(){
       if (sec <= 5) { beep(1000, 150); vib(80); } else { beep(880, 200); say(sec + '秒前'); }
     } else if (remain <= 0 && remain > -1500 && lastSsCue !== 0) {
       lastSsCue = 0; beep(1400, 900); vib(600);
+      S.ssStartTotal = totalM();
       if (S.ssResetTrips) { S.interRaw = 0; S.interAdj = 0; S.frozen = false; S.interDown = false; }
       save();
     } else if (remain > 31000) lastSsCue = Infinity;
+  }
+  if (S.ssStart != null && S.ssFinish == null && n >= S.ssStart) {
+    if (S.ssStartTotal == null) { S.ssStartTotal = totalM(); save(); }  // スタートの瞬間に画面が閉じていた場合
+    if (S.ssDist > 0) {
+      // SS距離に届いた＝フィニッシュ通過（目安）
+      if (totalM() - S.ssStartTotal >= S.ssDist) A.ssFinish(n);
+    } else if (n - S.ssStart > 60000) {
+      // 距離が無い時の予備：1分以上走ってから8秒止まったらストップに着いたとみなす
+      if (R.speed < 3) { stillSince = stillSince ?? n; if (n - stillSince > 8000) { A.ssFinish(stillSince); stillSince = null; } }
+      else stillSince = null;
+    }
   }
   // TC
   const t = targetMs();
@@ -505,6 +565,26 @@ function render(n){
   else if (S.secStart != null) { L = `${S.tcLabel} 区間スタート ${hm(S.secStart)}`; Rt = '所要時間を入力'; C = 'var(--warn)'; }
   setText('stripL', L); setText('stripR', Rt); $('stripR').style.color = C;
 
+  // SS枠：スタート10分前〜走行中〜タイム入力待ち
+  const box = $('ssBox');
+  let bl = '', bv = '', bc = 'var(--fg)', bcls = '';
+  if (S.ssAwait != null && S.ssRecords[S.ssAwait]) {
+    bl = `${S.ssRecords[S.ssAwait].l} 終了（タップ）`; bv = 'タイム入力'; bc = 'var(--amber)'; bcls = 'await';
+  } else if (S.ssStart != null && S.ssFinish == null && S.ssStart - n <= 600000 && n - S.ssStart < 3600e3) {
+    if (n < S.ssStart) { bl = `${S.ssLabel} スタートまで` + (S.ssDist > 0 ? `（${km(S.ssDist)} km）` : '（SS距離未設定）'); bv = mmss(S.ssStart - n); bc = S.ssStart - n <= 30000 ? 'var(--warn)' : 'var(--fg)'; }
+    else {
+      bl = `${S.ssLabel} 走行中` + (S.ssDist > 0 && S.ssStartTotal != null ? `　残り ${km(Math.max(0, S.ssDist - (totalM() - S.ssStartTotal)))} km` : '');
+      bv = stageTime(n - S.ssStart); bc = 'var(--ok)'; bcls = 'run';
+    }
+  }
+  box.className = 'panel' + (bl ? ' on ' + bcls : '');
+  if (bl) {
+    setText('ssBoxLab', bl); setText('ssBoxV', bv); $('ssBoxV').style.color = bc;
+    $('ssBoxV').style.setProperty('--ch', bcls === 'await' ? 9 : Math.max(bv.length, 5));
+  }
+  // SS枠が出ている間、上の帯はTCの目標がある時だけ出す（情報を減らす）
+  $('strip').style.visibility = (bl && t == null) ? 'hidden' : '';
+
   // 距離
   const iv = interShown();
   const is = km(iv), ts = km(totalShown());
@@ -546,10 +626,14 @@ function renderTc(n){
     if (n < st) h += `<div class="num big3" style="color:${st - n <= 30000 ? 'var(--warn)' : 'var(--fg)'}">あと ${mmss(st - n)}</div>`;
     else h += `<div class="num big3" style="color:var(--ok)">${stageTime(n - st)}</div>`;
   } else if (S.ssFinish != null && S.ssRecords.length) {
-    const r = S.ssRecords.at(-1); h = `<div style="color:var(--ok);font-size:18px">${r.l} タイム ${stageTime(r.f - r.s)}（自分の計測・参考）</div>`;
+    const r = S.ssRecords.at(-1);
+    h = r.t != null ? `<div style="color:var(--ok);font-size:20px">${r.l} タイム ${stageTime(r.t)}</div>`
+                    : `<div style="color:var(--amber);font-size:18px">${r.l} タイム未入力（目安 ${stageTime(r.f - r.s)}）</div>`;
   }
   if ($('ssInfo').innerHTML !== h) $('ssInfo').innerHTML = h;
   $('ssFin').style.display = (st != null && S.ssFinish == null && n >= st) ? '' : 'none';
+  $('ssTimeBtn').style.display = S.ssAwait != null ? '' : 'none';
+  setText('ssDistV', S.ssDist > 0 ? `設定中 ${km(S.ssDist)} km` : '未設定（止まったら終了）');
   $('swSsReset').classList.toggle('on', S.ssResetTrips);
 }
 
@@ -573,15 +657,16 @@ function renderRec(){
   let late = 0, early = 0;
   S.tcRecords.forEach(r => { const d = Math.round((r.a - r.t) / 60000); if (d > 0) late += d; else early -= d; });
   $('penalty').textContent = (late + early) ? `ペナルティ計：遅着 ${late * 10}秒 ／ 早着 ${early}分　累積遅れ ${late}分（30分超で離脱）` : '';
-  $('ssTable').innerHTML = S.ssRecords.length ? S.ssRecords.map((r, i) =>
-    `<tr><td>${r.l}</td><td class="num" style="color:var(--ok);font-size:20px">${stageTime(r.f - r.s)}</td><td><button class="b" data-del-ss="${i}">削除</button></td></tr>`
+  $('ssTable').innerHTML = S.ssRecords.length ? S.ssRecords.map((r, i) => r.t != null
+    ? `<tr><td>${r.l}</td><td class="num" style="color:var(--ok);font-size:20px">${stageTime(r.t)}<br><span class="note">目安 ${stageTime(r.f - r.s)}</span></td><td><button class="b" data-time-ss="${i}">修正</button> <button class="b" data-del-ss="${i}">削除</button></td></tr>`
+    : `<tr><td>${r.l}</td><td style="color:var(--amber)">未入力<br><span class="note">目安 ${stageTime(r.f - r.s)}</span></td><td><button class="b" data-time-ss="${i}">入力</button> <button class="b" data-del-ss="${i}">削除</button></td></tr>`
   ).join('') : '<tr><td class="note">まだありません</td></tr>';
 }
 function exportText(){
   let s = 'ラリコン 記録\n補正係数 ' + S.factor.toFixed(5) + '\n\n[TC]\n';
   S.tcRecords.forEach(r => s += `${r.l}  目標 ${hm(r.t)}  実際 ${hm(r.a)}  ${diffText(Math.round((r.a - r.t) / 60000))}\n`);
   s += '\n[SS]\n';
-  S.ssRecords.forEach(r => s += `${r.l}  スタート ${hms(r.s)}  タイム ${stageTime(r.f - r.s)}\n`);
+  S.ssRecords.forEach(r => s += `${r.l}  スタート ${hms(r.s)}  タイム ${r.t != null ? stageTime(r.t) : '未入力'}  目安 ${stageTime(r.f - r.s)}\n`);
   return s;
 }
 
@@ -627,6 +712,7 @@ function fillTcInputs(){
   $('tcLabel').value = S.tcLabel; $('ssLabel').value = S.ssLabel;
   if (S.secStart != null) { const d = new Date(S.secStart); $('secH').value = p2(d.getHours()); $('secM').value = p2(d.getMinutes()); } else { $('secH').value = ''; $('secM').value = ''; }
   $('secD').value = S.secDur > 0 ? S.secDur : '';
+  $('ssDistIn').value = S.ssDist > 0 ? (S.ssDist / 1000).toFixed(2) : '';
   if (S.ssStart != null) { const d = new Date(S.ssStart); $('ssH').value = p2(d.getHours()); $('ssMi').value = p2(d.getMinutes()); } else { $('ssH').value = ''; $('ssMi').value = ''; }
 }
 $('tcLabel').addEventListener('change', e => { S.tcLabel = e.target.value || 'TC'; save(); });
@@ -649,6 +735,29 @@ on('ssSet', () => {
 });
 on('ssClear', () => { S.ssStart = null; S.ssFinish = null; save(); fillTcInputs(); });
 on('ssFin', () => A.ssFinish());
+on('ssDistSet', () => {
+  const v = parseFloat($('ssDistIn').value);
+  if (!(v > 0 && v < 100)) { S.ssDist = 0; save(); return toast('SS距離を消しました（止まったら終了）'); }
+  S.ssDist = Math.round(v * 1000); save(); toast(`SS距離 ${km(S.ssDist)} km`);
+});
+let dlgIdx = null;
+function openSsDlg(i){
+  const r = S.ssRecords[i]; if (!r) return; dlgIdx = i;
+  setText('ssDlgT', `${r.l} のタイム（ストップで言われたもの）`);
+  setText('ssDlgEst', `目安タイム：${stageTime(r.f - r.s)}（${r.by === 'dist' ? 'SS距離で判定' : '止まった時点'}）`);
+  if (r.t != null) { const t = Math.round(r.t / 100); $('tM').value = Math.floor(t / 600); $('tS').value = Math.floor((t % 600) / 10); $('tT').value = t % 10; }
+  else { $('tM').value = ''; $('tS').value = ''; $('tT').value = ''; }
+  $('ssDlg').classList.add('on'); setTimeout(() => $('tM').focus(), 50);
+}
+function closeSsDlg(){ $('ssDlg').classList.remove('on'); dlgIdx = null; }
+on('ssBox', () => { if (S.ssAwait != null) openSsDlg(S.ssAwait); });
+on('ssTimeBtn', () => { if (S.ssAwait != null) openSsDlg(S.ssAwait); });
+on('ssDlgLater', closeSsDlg);
+on('ssDlgOk', () => {
+  const m = parseInt($('tM').value) || 0, sec = parseInt($('tS').value), t = parseInt($('tT').value) || 0;
+  if (!(sec >= 0 && sec <= 59) || m < 0 || t < 0 || t > 9) return toast('タイムを確認してください（分・秒・1/10秒）');
+  A.ssSetTime(dlgIdx, (m * 60 + sec) * 1000 + t * 100); closeSsDlg(); renderRec(); toast('タイムを記録しました');
+});
 on('swSsReset', () => { S.ssResetTrips = !S.ssResetTrips; save(); });
 
 // 記録
@@ -659,7 +768,8 @@ on('share', async () => {
 $('view-set').addEventListener('click', e => {
   const t = e.target.dataset.delTc, s = e.target.dataset.delSs;
   if (t != null) { S.tcRecords.splice(+t, 1); save(); renderRec(); }
-  if (s != null) { S.ssRecords.splice(+s, 1); save(); renderRec(); }
+  if (s != null) { S.ssRecords.splice(+s, 1); if (S.ssAwait != null) S.ssAwait = S.ssAwait === +s ? null : S.ssAwait > +s ? S.ssAwait - 1 : S.ssAwait; save(); renderRec(); }
+  const ti = e.target.dataset.timeSs; if (ti != null) openSsDlg(+ti);
 });
 
 // 設定
