@@ -32,8 +32,15 @@ button:active{background:#333}
 /* ---------- 走行画面 ---------- */
 #view-drive.on{display:grid;gap:6px;padding:6px;
   grid-template-columns:2fr 1fr;
-  grid-template-rows:auto minmax(0,1fr) auto;
-  grid-template-areas:"top top" "nums nums" "adj rst"}
+  grid-template-rows:auto minmax(0,1fr) auto auto;
+  grid-template-areas:"top top" "nums nums" "adj rst" "ctrl ctrl"}
+#ctrl{grid-area:ctrl;display:flex;gap:6px}
+#ctrl.off{display:none}
+#ciBtn{flex:2;height:64px;font-size:20px;font-weight:800;color:var(--ok);line-height:1.1;display:flex;flex-direction:column;align-items:center;justify-content:center}
+#ciBtn small{font-size:12px;font-weight:400;margin-top:3px}
+#ciMinus,#ciPlus{flex:.8;height:64px;font-size:17px;font-weight:800;line-height:1.1}
+#ciMinus small,#ciPlus small{display:block;font-size:11px;font-weight:400;color:var(--dim)}
+@media (orientation:landscape){#ciBtn,#ciMinus,#ciPlus{height:46px}#ciBtn{font-size:17px;flex-direction:row;gap:10px}#ciBtn small{margin:0}#ciMinus small,#ciPlus small{display:none}}
 #center{display:contents}
 #top{grid-area:top;display:flex;flex-direction:column;gap:6px}
 #nums{grid-area:nums;display:flex;flex-direction:column;gap:6px;min-height:0}
@@ -196,6 +203,11 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
           </div>
         </div>
       </div>
+      <div id="ctrl">
+        <button id="ciBtn"></button>
+        <button id="ciMinus">−1分<small>時刻補正</small></button>
+        <button id="ciPlus">＋1分<small>時刻補正</small></button>
+      </div>
     </div>
     <button id="rstInter">INTER<br>0</button>
   </main>
@@ -309,7 +321,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
     </div>
     <div class="card">
       <div class="note" id="gpsInfo"></div>
-      <div class="note" id="verNote">ラリコン Web版 0.5.0</div>
+      <div class="note" id="verNote">ラリコン Web版 0.5.1</div>
     </div>
   </section>
 
@@ -339,7 +351,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
   <button data-k="." id="kpDot">.</button><button data-k="0">0</button><button data-k="bs" class="fn">⌫</button>
   <button data-k="next" class="fn">次へ</button><button data-k="done" class="fn ok" style="grid-column:span 2">完了</button>
 </div>
-<div id="undo"><span>INTERを0にしました</span><button id="undoBtn">元に戻す</button></div>
+<div id="undo"><span id="undoMsg">INTERを0にしました</span><button id="undoBtn">元に戻す</button></div>
 <div id="simBadge">シミュレーション</div>
 
 <script>
@@ -464,14 +476,14 @@ const A = {
     save(); flash(sign > 0 ? 'plus' : 'minus');
   },
   resetInter(){
-    undoSnap = { interRaw:S.interRaw, interAdj:S.interAdj, frozen:S.frozen, frozenInter:S.frozenInter, interDown:S.interDown, interTarget:S.interTarget };
-    S.interRaw = 0; S.interAdj = 0; S.frozen = false; save(); vib(40); showUndo();
+    const snap = { interRaw:S.interRaw, interAdj:S.interAdj, frozen:S.frozen, frozenInter:S.frozenInter, interDown:S.interDown, interTarget:S.interTarget };
+    S.interRaw = 0; S.interAdj = 0; S.frozen = false; save(); vib(40);
+    // 戻すまでに走った距離は捨てずに足す
+    showUndo('INTERを0にしました', () => { const ran = S.interRaw; Object.assign(S, snap); S.interRaw += ran; });
   },
   undo(){
-    if (!undoSnap) return;
-    // 戻すまでに走った距離は捨てずに足す
-    const ranRaw = S.interRaw;
-    Object.assign(S, undoSnap); S.interRaw += ranRaw; undoSnap = null; save(); hideUndo(); toast('元に戻しました');
+    if (!undoFn) return;
+    undoFn(); save(); hideUndo(); toast('元に戻しました');
   },
   resetTotal(){ Object.assign(S, { totalRaw:0, totalAdj:0, interRaw:0, interAdj:0, frozen:false, gapCount:0 }); R.maxSpeed = 0; save(); toast('全部0にしました'); },
   freeze(){ if (S.frozen) S.frozen = false; else { S.frozen = true; S.frozenInter = interM(); S.frozenTotal = totalM(); } save(); },
@@ -479,6 +491,7 @@ const A = {
   setTotalTo(m){ S.totalAdj = m - S.totalRaw * S.factor; save(); },
   down(m){ if (m == null) S.interDown = false; else Object.assign(S, { interDown:true, interTarget:m, interRaw:0, interAdj:0, frozen:false }); save(); },
   checkIn(){
+    const snap = JSON.parse(JSON.stringify({ tcRecords:S.tcRecords, tcLabel:S.tcLabel, ssStart:S.ssStart, ssFinish:S.ssFinish, secStart:S.secStart, secDur:S.secDur, nextIsSs:S.nextIsSs }));
     const actual = ciActual();
     const target = targetMs() ?? actual;
     S.tcRecords.push({ l:S.tcLabel, t:target, a:actual });
@@ -488,8 +501,8 @@ const A = {
       Object.assign(S, { ssStart:st, ssFinish:null, secStart:st, secDur:0, nextIsSs:false });
       lastSsCue = Infinity;
     } else Object.assign(S, { secStart:actual, secDur:0 });
-    ciOverride = null; save();
-    toast(`${S.tcRecords.at(-1).l} ${hm(actual)} を記録`);
+    ciOverride = null; save(); vib(60);
+    showUndo(`${S.tcRecords.at(-1).l} ${hm(actual)} でチェックイン`, () => { Object.assign(S, snap); lastSsCue = Infinity; });
   },
   // SS終了（ストップで止まったら自動）。タイムは主催者に言われたものを後で入力
   ssFinish(at){
@@ -618,6 +631,16 @@ function render(n){
   box.className = 'panel' + (bl ? ' on ' + bcls : '');
   // SS枠が出ている間はTOTAL（と速度）を消して、その場所にSS枠を出す
   $('totP').style.display = bl ? 'none' : '';
+  // 下の段（TCチェックイン）はSS中は消す
+  $('ctrl').classList.toggle('off', !!bl);
+  if (!bl) {
+    const a = ciActual(), tg = targetMs();
+    const d = tg != null ? Math.round((a - tg) / 60000) : null;
+    const sub = d == null ? '目標未設定' : d === 0 ? '定刻' : d > 0 ? `遅着 ${d}分` : `早着 ${-d}分`;
+    const html = `${S.tcLabel} チェックイン ${hm(a)}<small>${sub}${ciOverride != null ? '（補正中）' : ''}</small>`;
+    if ($('ciBtn').innerHTML !== html) $('ciBtn').innerHTML = html;
+    $('ciBtn').style.color = d == null || d === 0 ? 'var(--ok)' : 'var(--bad)';
+  }
   if (bl) {
     setText('ssBoxLab', bl); setText('ssBoxV', bv); $('ssBoxV').style.color = bc;
     $('ssBoxV').style.setProperty('--ch', bcls === 'await' ? 9 : Math.max(bv.length, 5));
@@ -743,10 +766,15 @@ document.querySelectorAll('[data-long]').forEach(b => {
   b.addEventListener('click', () => { if (!done) toast(b.dataset.hint); });
 });
 // INTER 0：いつでも1タップ（押し間違えたら5秒以内に「元に戻す」）
-let undoSnap = null, undoTimer = null;
-function showUndo(){ $('undo').classList.add('on'); clearTimeout(undoTimer); undoTimer = setTimeout(hideUndo, 5000); }
-function hideUndo(){ $('undo').classList.remove('on'); undoSnap = null; }
+let undoTimer = null;
+let undoFn = null;
+function showUndo(msg, fn){ undoFn = fn; $('undoMsg').textContent = msg; $('undo').classList.add('on'); clearTimeout(undoTimer); undoTimer = setTimeout(hideUndo, 5000); }
+function hideUndo(){ $('undo').classList.remove('on'); undoFn = null; }
 on('undoBtn', () => A.undo());
+// 走行画面のTCチェックイン：1タップ＋5秒間「元に戻す」
+on('ciBtn', () => { A.checkIn(); flash('ciBtn'); });
+on('ciMinus', () => { ciOverride = ciActual() - 60000; });
+on('ciPlus', () => { ciOverride = ciActual() + 60000; });
 $('rstInter').addEventListener('pointerdown', e => { e.preventDefault(); A.resetInter(); flash('rstInter'); });
 // FREEZE・ロックは走行画面から外した（A.freeze と #lock は復活用に残してある）
 (() => { let h; const u = $('unlock');
@@ -909,7 +937,7 @@ async function goFull(){
   try { if (!document.fullscreenElement) await document.documentElement.requestFullscreen({ navigationUI:'hide' }); } catch (e) {}
   await lockOrient();
 }
-if (NATIVE) { try { $('verNote').textContent = 'ラリコン アプリ版 ' + NATIVE.version() + '（画面 Web版 0.5.0）'; } catch (e) {} }
+if (NATIVE) { try { $('verNote').textContent = 'ラリコン アプリ版 ' + NATIVE.version() + '（画面 Web版 0.5.1）'; } catch (e) {} }
 // 起動ロゴ：タップで飛ばせる・終わったら消す
 (() => { const sp = $('splash'); const end = () => sp.remove();
   sp.addEventListener('pointerdown', end); setTimeout(end, 2500); })();
