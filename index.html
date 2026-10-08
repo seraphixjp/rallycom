@@ -32,12 +32,11 @@ button:active{background:#333}
 /* ---------- 走行画面 ---------- */
 #view-drive.on{display:grid;gap:6px;padding:6px;
   grid-template-columns:2fr 1fr;
-  grid-template-rows:auto minmax(0,1fr) auto auto;
-  grid-template-areas:"top top" "nums nums" "adj rst" "ctrl ctrl"}
+  grid-template-rows:auto minmax(0,1fr) auto;
+  grid-template-areas:"top top" "nums nums" "adj rst"}
 #center{display:contents}
 #top{grid-area:top;display:flex;flex-direction:column;gap:6px}
 #nums{grid-area:nums;display:flex;flex-direction:column;gap:6px;min-height:0}
-#ctrl{grid-area:ctrl;display:flex;gap:8px}
 #adj{grid-area:adj;display:flex;gap:6px}
 #adj .step{flex:1}
 #adj .step{font-size:26px}
@@ -45,7 +44,6 @@ button:active{background:#333}
 .step small{font-size:14px;font-weight:400;color:var(--dim);margin-top:4px}
 #rstInter{grid-area:rst;font-size:24px;font-weight:800;line-height:1.05;color:var(--amber);display:flex;flex-direction:column;align-items:center;justify-content:center}
 #rstInter small{font-size:12px;font-weight:400;color:var(--dim);margin-top:6px}
-#ctrl button{flex:1;height:60px;font-size:16px;font-weight:700;line-height:1.15}
 @media (orientation:landscape){
   #view-drive.on{grid-template-columns:68px minmax(0,1fr) 104px;grid-template-rows:minmax(0,1fr);grid-template-areas:"adj center rst"}
   #adj{flex-direction:column}
@@ -55,7 +53,6 @@ button:active{background:#333}
   #nums > #interP{flex:2.3 1 0}#nums > #rcol{flex:1.1 1 0}
   .step{height:auto}
   #rstInter{font-size:28px}
-  #ctrl button{height:44px;font-size:14px}
 }
 #undo{position:fixed;left:50%;bottom:64px;transform:translateX(-50%);z-index:30;display:none;align-items:center;gap:12px;background:#333;border-radius:10px;padding:8px 8px 8px 16px;font-size:15px}
 #undo.on{display:flex}
@@ -172,10 +169,6 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
           </div>
         </div>
       </div>
-      <div id="ctrl">
-        <button id="freeze">FREEZE</button>
-        <button id="lockBtn">ロック</button>
-      </div>
     </div>
     <button id="rstInter">INTER<br>0</button>
   </main>
@@ -285,12 +278,11 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
       <div class="note">物理ボタン（Bluetoothのプレゼン用リモコン・キーボード）<br>
         ・次へ（→ / PageDown）・↑ … 距離＋<br>
         ・前へ（← / PageUp）・↓ … 距離−<br>
-        ・Enter / スペース … FREEZE<br>
         本体の音量キーは、ふつうの音量調整に使えます。</div>
     </div>
     <div class="card">
       <div class="note" id="gpsInfo"></div>
-      <div class="note">ラリコン Web版 0.3.3</div>
+      <div class="note">ラリコン Web版 0.3.4</div>
     </div>
   </section>
 
@@ -602,7 +594,7 @@ function render(n){
   setText('stepL1', S.step + 'm'); setText('stepL2', S.step + 'm');
   const ssRun = S.ssStart != null && S.ssFinish == null && n >= S.ssStart && n - S.ssStart < 3600e3;
   $('view-drive').classList.toggle('ssrun', ssRun);
-  setText('freeze', S.frozen ? '解除' : 'FREEZE'); $('freeze').style.color = S.frozen ? 'var(--warn)' : '';
+
 
   if (view === 'tc') renderTc(n);
   if (view === 'set') renderSet();
@@ -704,8 +696,7 @@ function showUndo(){ $('undo').classList.add('on'); clearTimeout(undoTimer); und
 function hideUndo(){ $('undo').classList.remove('on'); undoSnap = null; }
 on('undoBtn', () => A.undo());
 $('rstInter').addEventListener('pointerdown', e => { e.preventDefault(); A.resetInter(); flash('rstInter'); });
-on('freeze', () => A.freeze());
-on('lockBtn', () => { R.locked = true; $('lock').classList.add('on'); });
+// FREEZE・ロックは走行画面から外した（A.freeze と #lock は復活用に残してある）
 (() => { let h; const u = $('unlock');
   u.addEventListener('pointerdown', () => { h = setTimeout(() => { R.locked = false; $('lock').classList.remove('on'); vib(60); }, 800); });
   ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => u.addEventListener(ev, () => clearTimeout(h)));
@@ -808,7 +799,7 @@ document.addEventListener('keydown', e => {
   const k = e.key;
   if (['ArrowRight', 'PageDown', 'ArrowUp', '+', '='].includes(k)) { e.preventDefault(); A.step(+1); }
   else if (['ArrowLeft', 'PageUp', 'ArrowDown', '-'].includes(k)) { e.preventDefault(); A.step(-1); }
-  else if ((k === 'Enter' || k === ' ') && !e.repeat) { e.preventDefault(); A.freeze(); }
+
 });
 
 // ================= 起動 =================
