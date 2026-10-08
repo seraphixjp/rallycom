@@ -40,18 +40,19 @@ button:active{background:#333}
 #ctrl{grid-area:ctrl;display:flex;gap:8px}
 #adj{grid-area:adj;display:flex;gap:6px}
 #adj .step{flex:1}
+#adj .step{font-size:26px}
 .step{height:84px;font-size:30px;font-weight:800;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
 .step small{font-size:14px;font-weight:400;color:var(--dim);margin-top:4px}
 #rstInter{grid-area:rst;font-size:24px;font-weight:800;line-height:1.05;color:var(--amber);display:flex;flex-direction:column;align-items:center;justify-content:center}
 #rstInter small{font-size:12px;font-weight:400;color:var(--dim);margin-top:6px}
 #ctrl button{flex:1;height:60px;font-size:16px;font-weight:700;line-height:1.15}
 @media (orientation:landscape){
-  #view-drive.on{grid-template-columns:96px minmax(0,1fr) 104px;grid-template-rows:minmax(0,1fr);grid-template-areas:"adj center rst"}
+  #view-drive.on{grid-template-columns:68px minmax(0,1fr) 104px;grid-template-rows:minmax(0,1fr);grid-template-areas:"adj center rst"}
   #adj{flex-direction:column}
   #center{display:flex;flex-direction:column;gap:4px;grid-area:center;min-height:0;min-width:0}
   #top{flex-direction:row;align-items:center}
   #nums{flex:1;flex-direction:row}
-  #interP{flex:1.6}#totP{flex:1}
+  #nums > #interP{flex:2.3 1 0}#nums > #totP{flex:1 1 0}
   .step{height:auto}
   #rstInter{font-size:28px}
   #ctrl button{height:44px;font-size:14px}
@@ -260,7 +261,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
     </div>
     <div class="card">
       <div class="note" id="gpsInfo"></div>
-      <div class="note">ラリコン Web版 0.2.3</div>
+      <div class="note">ラリコン Web版 0.2.4</div>
     </div>
   </section>
 
