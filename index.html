@@ -58,6 +58,9 @@ button:active{background:#333}
 }
 #undo{position:fixed;left:50%;bottom:64px;transform:translateX(-50%);z-index:30;display:none;align-items:center;gap:12px;background:#333;border-radius:10px;padding:8px 8px 8px 16px;font-size:15px}
 #undo.on{display:flex}
+/* SS走行中はINTERまわりをSSカラー（緑）に */
+#view-drive.ssrun #inter,#view-drive.ssrun #rstInter{color:var(--ok)}
+#view-drive.ssrun #inter.neg{color:var(--bad)}
 @media (orientation:landscape){#undo{bottom:96px}}
 @media (orientation:portrait){#undo{bottom:240px}}
 #undo button{height:44px;padding:0 16px;font-weight:800;background:var(--amber);color:#000;border:0}
@@ -257,7 +260,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
     </div>
     <div class="card">
       <div class="note" id="gpsInfo"></div>
-      <div class="note">ラリコン Web版 0.2.2</div>
+      <div class="note">ラリコン Web版 0.2.3</div>
     </div>
   </section>
 
@@ -513,6 +516,8 @@ function render(n){
   setText('interLab', S.interDown ? 'INTER ▼ 残り km' : 'INTER km');
   $('badges').innerHTML = (S.frozen ? '<span class="badge">FREEZE</span>' : '') + (S.calibActive ? ' <span class="badge c">校正中</span>' : '');
   setText('stepL1', S.step + 'm'); setText('stepL2', S.step + 'm');
+  const ssRun = S.ssStart != null && S.ssFinish == null && n >= S.ssStart && n - S.ssStart < 3600e3;
+  $('view-drive').classList.toggle('ssrun', ssRun);
   setText('freeze', S.frozen ? '解除' : 'FREEZE'); $('freeze').style.color = S.frozen ? 'var(--warn)' : '';
 
   if (view === 'tc') renderTc(n);
