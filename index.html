@@ -96,6 +96,8 @@ button:active{background:#333}
 .fit{flex:1;min-height:0;container-type:size;display:flex;align-items:center;justify-content:flex-end;overflow:hidden}
 .fit span{white-space:nowrap;line-height:1;font-size:min(88cqh,calc(100cqw / (var(--ch) * .6)))}
 #inter{color:var(--amber);--ch:6}
+#ssDelta{font-size:30px;font-weight:800;font-family:var(--num);font-variant-numeric:tabular-nums;line-height:1.1}
+#ssDelta small{font-size:14px;font-weight:400;color:var(--dim);margin-right:6px}
 #inter.neg{color:var(--bad)}
 #total{--ch:6}#speed{--ch:3}
 /* 右の列：TOTAL（SS中はSS枠）と速度を縦に2枠 */
@@ -200,7 +202,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
       </div>
       <div id="nums">
         <div class="panel" id="interP">
-          <div class="lab"><span id="interLab">INTER km</span><span class="sp"></span><span id="badges"></span></div>
+          <div class="lab"><span id="interLab">INTER km</span><span class="sp"></span><span id="ssDelta"></span><span id="badges"></span></div>
           <div class="fit"><span id="inter" class="num">0.00</span></div>
         </div>
         <div id="rcol">
@@ -261,7 +263,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
     <div class="card">
       <div class="row"><h3>SS</h3><input type="text" id="ssLabel" class="w"></div>
       <div class="row"><span class="note">コース名</span><input type="text" id="ssCourse" style="width:200px;font-size:22px" placeholder="例：赤城"></div>
-      <div class="note">同じコースを2回目以降走る時は同じ名前にすると、前回のタイムと比べます（SS距離が前回と同じなら自動で同じコースにします）。</div>
+      <div class="note">入れなくても、SSのスタート地点が前回のSSと同じ（200m以内）なら自動で同じコースとして前回のタイムと比べます。名前を付けたい時だけ入れてください。</div>
       <div id="ssInfo"></div>
       <button class="b big" id="ssFin" style="display:none">SSを手動で終了（ふつうは止まると自動で終了）</button>
       <button class="b big okc" id="ssTimeBtn" style="display:none">SSタイムを入力</button>
@@ -341,7 +343,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
     </div>
     <div class="card">
       <div class="note" id="gpsInfo"></div>
-      <div class="note" id="verNote">ラリコン Web版 0.6.1</div>
+      <div class="note" id="verNote">ラリコン Web版 0.6.2</div>
       <div class="note">音声：VOICEVOX:四国めたん</div>
     </div>
   </section>
@@ -397,6 +399,8 @@ const DEF = {
   planStart:null, // 区間表のスタート時刻（0時からの分）
   planIdx:null,   // 区間表で次に向かうTCの番号（使っていない時はnull）
   ssCourse:'',    // 次のSSのコース名（同じコースの前回タイムと比べる）
+  ssStartPos:null, // SSスタート地点 [緯度, 経度]。同じ地点から始まるSS＝同じコース
+  ssTrace:[],     // 走行中のSSで100mごとの通過タイム（0.1秒単位）。記録に残して次回の比較に使う
 };
 let S = JSON.parse(JSON.stringify(DEF));   // DEFの配列を共有しないようにコピー
 try { Object.assign(S, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
@@ -538,12 +542,14 @@ const A = {
   // SS終了（ストップで止まったら自動）。タイムは主催者に言われたものを後で入力
   ssFinish(at, manual){
     if (S.ssStart == null || S.ssFinish != null) return; const n = at ?? now(); if (n <= S.ssStart) return;
-    const snapSs = manual ? JSON.parse(JSON.stringify({ ssFinish:S.ssFinish, ssRecords:S.ssRecords, ssDist:S.ssDist, ssStartTotal:S.ssStartTotal, ssAwait:S.ssAwait, ssLabel:S.ssLabel, ssCourse:S.ssCourse })) : null;
+    const snapSs = manual ? JSON.parse(JSON.stringify({ ssFinish:S.ssFinish, ssRecords:S.ssRecords, ssDist:S.ssDist, ssStartTotal:S.ssStartTotal, ssAwait:S.ssAwait, ssLabel:S.ssLabel, ssCourse:S.ssCourse, ssTrace:S.ssTrace, ssStartPos:S.ssStartPos })) : null;
     const fin = Math.floor(n / 100) * 100;
     const ranD = S.ssStartTotal != null ? Math.round(totalM() - S.ssStartTotal) : 0;
     S.ssFinish = fin; S.ssRecords.push({ l:S.ssLabel, s:S.ssStart, f:fin, t:null, by:S.ssDist > 0 ? 'dist' : 'stop',
-      d:S.ssDist || ranD, c:S.ssCourse || guessCourse(S.ssDist || ranD) });
-    S.ssDist = 0; S.ssStartTotal = null; S.ssCourse = '';
+      d:S.ssDist || ranD, sp:S.ssStartPos, tr:(S.ssTrace || []).slice(),
+      // コース名が無ければスタート地点（無ければ距離）で前回と同じコースか判定。初めてのコースは「SS1のコース」
+      c:S.ssCourse || guessCourse(S.ssDist || ranD, S.ssStartPos) || `${S.ssLabel}のコース` });
+    S.ssDist = 0; S.ssStartTotal = null; S.ssCourse = ''; S.ssTrace = []; S.ssStartPos = null;
     S.ssAwait = S.ssRecords.length - 1; S.ssLabel = nextLabel(S.ssLabel);
     // SS終了でINTERを0に（5秒間は元に戻せる）
     const snapI = { interRaw:S.interRaw, interAdj:S.interAdj, interDown:S.interDown, frozen:S.frozen };
@@ -609,13 +615,16 @@ function tick(){
       if (sec <= 5) { beep(1000, 150); vib(80); } else { beep(880, 200); say(sec + '秒前'); }
     } else if (remain <= 0 && remain > -1500 && lastSsCue !== 0) {
       lastSsCue = 0; beep(1400, 900); vib(600);
-      S.ssStartTotal = totalM();
+      S.ssStartTotal = totalM(); S.ssTrace = [0]; S.ssStartPos = curPos();
       if (S.ssResetTrips) { S.interRaw = 0; S.interAdj = 0; S.frozen = false; S.interDown = false; }
       save();
     } else if (remain > 31000) lastSsCue = Infinity;
   }
   if (S.ssStart != null && S.ssFinish == null && n >= S.ssStart) {
-    if (S.ssStartTotal == null) { S.ssStartTotal = totalM(); save(); }  // スタートの瞬間に画面が閉じていた場合
+    if (S.ssStartTotal == null) { S.ssStartTotal = totalM(); S.ssTrace = [0]; S.ssStartPos = curPos(); save(); }  // スタートの瞬間に画面が閉じていた場合
+    if (!S.ssTrace || !S.ssTrace.length) S.ssTrace = [0];
+    const ranNow = totalM() - S.ssStartTotal;
+    while (S.ssTrace.length * 100 <= ranNow && S.ssTrace.length < 1000) S.ssTrace.push(Math.round((n - S.ssStart) / 100));
     if (S.ssDist > 0) {
       // SS距離に届いた＝フィニッシュ通過（目安）
       if (totalM() - S.ssStartTotal >= S.ssDist) A.ssFinish(n);
@@ -677,10 +686,12 @@ function render(n){
   // SS枠：スタート10分前〜走行中〜タイム入力待ち
   const box = $('ssBox');
   let bl = '', bv = '', bc = 'var(--fg)', bcls = '';
-  if (S.ssAwait != null && S.ssRecords[S.ssAwait]) {
+  // 次のSSのカウントダウン・走行中は、前のSSのタイム入力待ちより優先
+  const ssNear = S.ssStart != null && S.ssFinish == null && S.ssStart - n <= 600000 && n - S.ssStart < 3600e3;
+  if (!ssNear && S.ssAwait != null && S.ssRecords[S.ssAwait]) {
     bl = `${S.ssRecords[S.ssAwait].l} 終了（タップ）`; bv = 'タイム入力'; bc = 'var(--amber)'; bcls = 'await';
-  } else if (S.ssStart != null && S.ssFinish == null && S.ssStart - n <= 600000 && n - S.ssStart < 3600e3) {
-    if (n < S.ssStart) { bl = `${S.ssLabel} スタートまで` + (S.ssDist > 0 ? `（${km(S.ssDist)} km）` : '（SS距離未設定）'); bv = mmss(S.ssStart - n); bc = S.ssStart - n <= 30000 ? 'var(--warn)' : 'var(--fg)'; }
+  } else if (ssNear) {
+    if (n < S.ssStart) { const lc = liveCourse(); bl = `${S.ssLabel} スタートまで` + (S.ssDist > 0 ? `（${km(S.ssDist)} km${lc ? '・' + lc : ''}）` : `（SS距離未設定${lc ? '・' + lc : ''}）`); bv = mmss(S.ssStart - n); bc = S.ssStart - n <= 30000 ? 'var(--warn)' : 'var(--fg)'; }
     else {
       // 走行中はタイムをINTERの大きい枠へ、こちらはSSの距離
       const ran = S.ssStartTotal != null ? totalM() - S.ssStartTotal : 0;
@@ -724,6 +735,11 @@ function render(n){
   setText('stepL1', S.step + 'm'); setText('stepL2', S.step + 'm');
   $('view-drive').classList.toggle('ssrun', ssRun);
   const rb = ssRun ? 'SS<br>終了' : 'INTER<br>0';
+  // 前回の同じ地点との差（速い＝緑のマイナス、遅い＝赤のプラス）
+  const ld = ssRun ? liveDelta(n) : null;
+  const ldh = ld == null ? '' : `<small>前回比</small>${ld <= 0 ? '−' : '+'}${Math.abs(ld / 1000).toFixed(1)}`;
+  if ($('ssDelta').innerHTML !== ldh) $('ssDelta').innerHTML = ldh;
+  $('ssDelta').style.color = ld != null && ld <= 0 ? 'var(--ok)' : 'var(--bad)';
   if ($('rstInter').innerHTML !== rb) $('rstInter').innerHTML = rb;
 
 
@@ -796,11 +812,35 @@ function cmpText(i){
   return q && r.t != null ? `前回 ${stageTime(q.t)}（${q.l}）→ ${deltaText(r.t - q.t)}` : '';
 }
 const cmpColor = i => { const r = S.ssRecords[i], q = prevRun(i); return q && r.t != null ? (r.t <= q.t ? 'var(--ok)' : 'var(--bad)') : 'var(--dim)'; };
-// SS距離が前回と同じ（±2%）ならそのコースとみなす
-function guessCourse(dist){
-  if (!(dist > 0)) return '';
-  for (let j = S.ssRecords.length - 1; j >= 0; j--) { const q = S.ssRecords[j]; if (q.c && q.d > 0 && Math.abs(q.d - dist) <= dist * 0.02) return q.c; }
+const curPos = () => R.prev ? [R.prev.lat, R.prev.lon] : null;
+// 同じコースの判定：①スタート地点が前回のSSのスタートから200m以内 ②（位置が無い時）SS距離が±2%
+function guessCourse(dist, pos){
+  if (pos) for (let j = S.ssRecords.length - 1; j >= 0; j--) {
+    const q = S.ssRecords[j];
+    if (q.c && q.sp && hav({ lat:pos[0], lon:pos[1] }, { lat:q.sp[0], lon:q.sp[1] }) <= 200) return q.c;
+  }
+  if (dist > 0) for (let j = S.ssRecords.length - 1; j >= 0; j--) {
+    const q = S.ssRecords[j];
+    if (q.c && q.d > 0 && Math.abs(q.d - dist) <= dist * 0.02) return q.c;
+  }
   return '';
+}
+// 走行中のSSのコース（入力が無ければSS距離から推定）と、比べる前回の走行（通過タイムがあるもの）
+// スタート前は今いる場所（スタート待ちの位置）で判定
+const liveCourse = () => S.ssCourse || guessCourse(S.ssDist, S.ssStartPos || curPos());
+function liveRef(){
+  const c = liveCourse(); if (!c) return null;
+  for (let j = S.ssRecords.length - 1; j >= 0; j--) { const q = S.ssRecords[j]; if (q.c === c && q.tr && q.tr.length > 2) return q; }
+  return null;
+}
+// 同じ距離の地点で前回より何秒速いか遅いか（ms、プラス＝遅い）
+function liveDelta(n){
+  if (S.ssStartTotal == null) return null;
+  const ref = liveRef(); if (!ref) return null;
+  const ran = totalM() - S.ssStartTotal; if (ran < 200) return null;
+  const k = ran / 100, i = Math.floor(k); if (i + 1 >= ref.tr.length) return null;
+  const rt = (ref.tr[i] + (ref.tr[i + 1] - ref.tr[i]) * (k - i)) * 100;
+  return (n - S.ssStart) - rt;
 }
 const courses = () => [...new Set(S.ssRecords.map(r => r.c).filter(Boolean))];
 function renderRec(){
@@ -1119,7 +1159,7 @@ async function goFull(){
   try { if (!document.fullscreenElement) await document.documentElement.requestFullscreen({ navigationUI:'hide' }); } catch (e) {}
   await lockOrient();
 }
-if (NATIVE) { try { $('verNote').textContent = 'ラリコン アプリ版 ' + NATIVE.version() + '（画面 Web版 0.6.1）'; } catch (e) {} }
+if (NATIVE) { try { $('verNote').textContent = 'ラリコン アプリ版 ' + NATIVE.version() + '（画面 Web版 0.6.2）'; } catch (e) {} }
 // 起動ロゴ：タップで飛ばせる・終わったら消す
 (() => { const sp = $('splash'); const end = () => sp.remove();
   sp.addEventListener('pointerdown', end); setTimeout(end, 2500); })();
