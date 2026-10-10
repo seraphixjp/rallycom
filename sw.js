@@ -1,6 +1,7 @@
 // 山の中で電波が無くても開けるように、全部キャッシュする（更新時は VERSION を上げる）
-const VERSION = 'rallycom-web-0.5.4';
-const FILES = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './seraphix-logo.png'];
+const VERSION = 'rallycom-web-0.6.0';
+const FILES = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './seraphix-logo.png',
+  './voice/phrases.json', './voice/s30.mp3', './voice/s15.mp3', './voice/s10.mp3', './voice/zone.mp3', './voice/target.mp3', './voice/ssfin.mp3', './voice/gps.mp3'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(VERSION).then(c => c.addAll(FILES))); self.skipWaiting(); });
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== VERSION).map(k => caches.delete(k)))));

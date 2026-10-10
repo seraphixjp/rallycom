@@ -38,6 +38,9 @@ button:active{background:#333}
 #ctrl.off{display:none}
 #ciBtn{flex:2;height:64px;font-size:20px;font-weight:800;color:var(--ok);line-height:1.1;display:flex;flex-direction:column;align-items:center;justify-content:center}
 #ciBtn small{font-size:12px;font-weight:400;margin-top:3px}
+/* 定刻でチェックインできる1分間はゆっくり点滅 */
+#ciBtn.blink{border:2px solid var(--ok);animation:ciBlink 1.6s ease-in-out infinite}
+@keyframes ciBlink{50%{background:#0b4d27}}
 #ciMinus,#ciPlus{flex:.8;height:64px;font-size:17px;font-weight:800;line-height:1.1}
 #ciMinus small,#ciPlus small{display:block;font-size:11px;font-weight:400;color:var(--dim)}
 @media (orientation:landscape){#ciBtn,#ciMinus,#ciPlus{height:46px}#ciBtn{font-size:17px;flex-direction:row;gap:10px}#ciBtn small{margin:0}#ciMinus small,#ciPlus small{display:none}}
@@ -147,6 +150,16 @@ input:focus{outline:none;border-color:var(--amber)}
 .tog.on{background:var(--ok);color:#000;border-color:var(--ok)}
 .tog.on small{color:#063}
 table{width:100%;border-collapse:collapse;font-size:15px}
+/* 区間表 */
+#planList .row{flex-wrap:nowrap;gap:3px;padding:4px 2px;border-bottom:1px solid var(--line);border-radius:6px}
+#planList .row.cur{background:#1a1400}
+#planList input,#planEd .ps input{width:50px;height:50px;font-size:24px;padding:0}
+#planList input.pd{width:70px;font-size:22px}
+#planList .pl{width:48px;font-size:15px;font-weight:700;flex:0 0 auto;display:flex;flex-direction:column;line-height:1.2}
+#planList .pss{height:50px;width:48px;padding:0;font-size:13px;flex:0 0 auto}
+#planList .pss.on{background:var(--ok);color:#000}
+#planList .pdur{font-size:11px;font-weight:400;color:var(--dim);white-space:nowrap}
+#planList .pdel{height:50px;width:36px;margin-left:auto;padding:0;color:var(--bad);flex:0 0 auto}
 td{padding:6px 4px;border-bottom:1px solid var(--line)}
 
 #lock{position:fixed;inset:0;display:none;z-index:10}
@@ -216,6 +229,17 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
   <section id="view-tc" class="view scroll">
     <div class="card"><span id="clock2" class="num big1" style="color:var(--cyan)"></span></div>
     <div class="card">
+      <div class="row"><h3 class="grow">区間表（TCの目標時刻をまとめて入力）</h3><button class="b" id="planToggle">開く</button></div>
+      <div id="planSum" class="note"></div>
+      <div id="planEd" style="display:none">
+        <div class="note">タイムカード・ロードブックのTC目標時刻を順に入れます。各区間の所要時間に直して使うので、遅着しても次からの目標は正しくずれます。「次SS」はそのTCの次がSSのとき（SS距離も入れておくと自動終了に使います）。</div>
+        <div class="row ps"><span class="note">スタート時刻</span><input class="kp" type="text" id="planSH" readonly data-len="2"> : <input class="kp" type="text" id="planSM" readonly data-len="2"></div>
+        <div id="planList"></div>
+        <div class="row" style="margin-top:8px"><button class="b grow" id="planAdd">＋ TCを追加</button></div>
+        <div class="row"><button class="b grow okc" id="planGo" style="height:56px">この表で開始</button><button class="b badc" id="planClear" data-long="planClear" data-hint="長押しで表を消す">表を消す</button></div>
+      </div>
+    </div>
+    <div class="card">
       <div class="row"><h3>次のTC</h3><input type="text" id="tcLabel" class="w"></div>
       <div id="tcInfo"></div>
       <div class="note">区間スタート（時:分）＋ 目標所要時間（分）</div>
@@ -230,14 +254,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
       </div>
       <button class="tog" id="swNextSs"></button>
       <div class="row" id="gapRow"><span class="note">間隔</span><button class="b" id="gapM">−1分</button><b id="gapV"></b><button class="b" id="gapP">＋1分</button></div>
-      <h3>チェックイン（カードに書かれた時刻）</h3>
-      <div class="row">
-        <button class="b" id="ciM">−1分</button>
-        <b id="ciV" class="num big2"></b>
-        <button class="b" id="ciP">＋1分</button>
-        <span class="grow note" id="ciDiff" style="text-align:right"></span>
-      </div>
-      <button class="b big okc" id="checkIn" data-long="checkIn" data-hint="長押しで記録（誤操作防止）">チェックイン記録</button>
+      <div class="note">チェックインは走行画面の下のボタンで記録します。</div>
     </div>
     <div class="card">
       <div class="row"><h3>SS</h3><input type="text" id="ssLabel" class="w"></div>
@@ -321,7 +338,8 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
     </div>
     <div class="card">
       <div class="note" id="gpsInfo"></div>
-      <div class="note" id="verNote">ラリコン Web版 0.5.4</div>
+      <div class="note" id="verNote">ラリコン Web版 0.6.0</div>
+      <div class="note">音声：VOICEVOX:四国めたん</div>
     </div>
   </section>
 
@@ -370,6 +388,9 @@ const DEF = {
   ssAwait:null,   // タイム入力待ちのSS記録の番号
   ssDist:0,       // SS距離(m)。0なら「止まったら終了」で判定
   ssStartTotal:null, // SSスタート時のTOTAL(m)。SS距離はここから数える
+  plan:[],        // 区間表 [{l:'TC1', tm:目標(0時からの分), ss:次はSS, dist:SS距離(m)}]
+  planStart:null, // 区間表のスタート時刻（0時からの分）
+  planIdx:null,   // 区間表で次に向かうTCの番号（使っていない時はnull）
 };
 let S = JSON.parse(JSON.stringify(DEF));   // DEFの配列を共有しないようにコピー
 try { Object.assign(S, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
@@ -491,7 +512,8 @@ const A = {
   setTotalTo(m){ S.totalAdj = m - S.totalRaw * S.factor; save(); },
   down(m){ if (m == null) S.interDown = false; else Object.assign(S, { interDown:true, interTarget:m, interRaw:0, interAdj:0, frozen:false }); save(); },
   checkIn(){
-    const snap = JSON.parse(JSON.stringify({ tcRecords:S.tcRecords, tcLabel:S.tcLabel, ssStart:S.ssStart, ssFinish:S.ssFinish, secStart:S.secStart, secDur:S.secDur, nextIsSs:S.nextIsSs }));
+    const snap = JSON.parse(JSON.stringify({ tcRecords:S.tcRecords, tcLabel:S.tcLabel, ssStart:S.ssStart, ssFinish:S.ssFinish, secStart:S.secStart, secDur:S.secDur, nextIsSs:S.nextIsSs, planIdx:S.planIdx, ssDist:S.ssDist }));
+    const row = S.planIdx != null ? S.plan[S.planIdx] : null;
     const actual = ciActual();
     const target = targetMs() ?? actual;
     S.tcRecords.push({ l:S.tcLabel, t:target, a:actual });
@@ -499,18 +521,30 @@ const A = {
     if (S.nextIsSs) {
       const st = actual + S.ssGap * 60000;
       Object.assign(S, { ssStart:st, ssFinish:null, secStart:st, secDur:0, nextIsSs:false });
+      if (row && row.dist > 0) S.ssDist = row.dist;
       lastSsCue = Infinity;
     } else Object.assign(S, { secStart:actual, secDur:0 });
+    // 区間表を使っていれば次のTCの所要時間を自動で入れる
+    if (row) { S.planIdx++; applyPlan(); }
     ciOverride = null; save(); vib(60);
     showUndo(`${S.tcRecords.at(-1).l} ${hm(actual)} でチェックイン`, () => { Object.assign(S, snap); lastSsCue = Infinity; });
   },
   // SS終了（ストップで止まったら自動）。タイムは主催者に言われたものを後で入力
-  ssFinish(at){
+  ssFinish(at, manual){
     if (S.ssStart == null || S.ssFinish != null) return; const n = at ?? now(); if (n <= S.ssStart) return;
+    const snapSs = manual ? JSON.parse(JSON.stringify({ ssFinish:S.ssFinish, ssRecords:S.ssRecords, ssDist:S.ssDist, ssStartTotal:S.ssStartTotal, ssAwait:S.ssAwait, ssLabel:S.ssLabel })) : null;
     const fin = Math.floor(n / 100) * 100;
     S.ssFinish = fin; S.ssRecords.push({ l:S.ssLabel, s:S.ssStart, f:fin, t:null, by:S.ssDist > 0 ? 'dist' : 'stop' });
     S.ssDist = 0; S.ssStartTotal = null;
     S.ssAwait = S.ssRecords.length - 1; S.ssLabel = nextLabel(S.ssLabel);
+    // SS終了でINTERを0に（5秒間は元に戻せる）
+    const snapI = { interRaw:S.interRaw, interAdj:S.interAdj, interDown:S.interDown, frozen:S.frozen };
+    Object.assign(S, { interRaw:0, interAdj:0, interDown:false, frozen:false });
+    // 手で押した終了は、元に戻すとSS走行中に戻る（距離で自動終了した時はINTERだけ戻す）
+    showUndo(manual ? 'SSを終了しました' : 'SS終了：INTERを0にしました', () => {
+      const ran = S.interRaw; Object.assign(S, snapI); S.interRaw += ran;
+      if (snapSs) Object.assign(S, snapSs);
+    });
     save(); beep(880, 300); vib(300); say('SS終了。タイムを入力してください');
   },
   ssSetTime(i, ms){ const r = S.ssRecords[i]; if (!r) return; r.t = ms; if (S.ssAwait === i) S.ssAwait = null; save(); },
@@ -520,6 +554,7 @@ const A = {
     R.maxSpeed = 0; R.prev = null; R.prevSpeed = 0; lastSsCue = Infinity; stillSince = null;
     save(); hideUndo(); closeSsDlg(); renderRec(); toast('全部リセットしました');
   },
+  planClear(){ S.plan = []; S.planStart = null; S.planIdx = null; save(); renderPlan(); toast('区間表を消しました'); },
   clearRecords(){ S.tcRecords = []; S.ssRecords = []; save(); toast('記録を消しました'); },
 };
 
@@ -531,8 +566,23 @@ function beep(freq, ms){
   o.frequency.value = freq; o.type = 'square'; g.gain.value = 0.25;
   o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + ms / 1000);
 }
+// 録音の声（VOICEVOX:四国めたん）。voice/phrases.json の key＝say() に渡す文
+const VOICE = {};
+let voiceSrc = null;
+async function loadVoice(){
+  try {
+    const j = await (await fetch('voice/phrases.json')).json();
+    for (const [k, f] of Object.entries(j.files)) VOICE[k] = await ac.decodeAudioData(await (await fetch('voice/' + f)).arrayBuffer());
+  } catch (e) {}
+}
 function say(t){
   if (!S.voice) return;
+  if (ac && VOICE[t]) {
+    // 直前のビープと重ならないよう少し遅らせる
+    try { if (voiceSrc) voiceSrc.stop(); } catch (e) {}
+    const src = ac.createBufferSource(); src.buffer = VOICE[t]; src.connect(ac.destination);
+    src.start(ac.currentTime + 0.3); voiceSrc = src; return;
+  }
   if (NATIVE) { NATIVE.speak(t); return; }
   if (!('speechSynthesis' in window)) return;
   speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.lang = 'ja-JP'; u.rate = 1.15; speechSynthesis.speak(u);
@@ -611,7 +661,7 @@ function render(n){
   let L = '区間未設定', Rt = 'TC・SSタブで入力', C = 'var(--dim)';
   const t = targetMs();
   if (S.ssStart != null && S.ssFinish == null && n < S.ssStart) { L = `${S.ssLabel} スタート ${hms(S.ssStart)}`; Rt = 'あと ' + mmss(S.ssStart - n); C = S.ssStart - n <= 30000 ? 'var(--warn)' : 'var(--fg)'; }
-  else if (S.ssStart != null && S.ssFinish == null && n - S.ssStart < 3600e3) { L = `${S.ssLabel} 走行中`; Rt = stageTime(n - S.ssStart); C = 'var(--ok)'; }
+  else if (S.ssStart != null && S.ssFinish == null && n - S.ssStart < 3600e3 && t == null) { L = `${S.ssLabel} 走行中`; Rt = stageTime(n - S.ssStart); C = 'var(--ok)'; }
   else if (t != null) { [Rt, C] = tcStatus(n, t); L = `${S.tcLabel} 目標 ${hm(t)}`; }
   else if (S.secStart != null) { L = `${S.tcLabel} 区間スタート ${hm(S.secStart)}`; Rt = '所要時間を入力'; C = 'var(--warn)'; }
   setText('stripL', L); setText('stripR', Rt); $('stripR').style.color = C;
@@ -624,8 +674,10 @@ function render(n){
   } else if (S.ssStart != null && S.ssFinish == null && S.ssStart - n <= 600000 && n - S.ssStart < 3600e3) {
     if (n < S.ssStart) { bl = `${S.ssLabel} スタートまで` + (S.ssDist > 0 ? `（${km(S.ssDist)} km）` : '（SS距離未設定）'); bv = mmss(S.ssStart - n); bc = S.ssStart - n <= 30000 ? 'var(--warn)' : 'var(--fg)'; }
     else {
-      bl = `${S.ssLabel} 走行中` + (S.ssDist > 0 && S.ssStartTotal != null ? `　残り ${km(Math.max(0, S.ssDist - (totalM() - S.ssStartTotal)))} km` : '');
-      bv = stageTime(n - S.ssStart); bc = 'var(--ok)'; bcls = 'run';
+      // 走行中はタイムをINTERの大きい枠へ、こちらはSSの距離
+      const ran = S.ssStartTotal != null ? totalM() - S.ssStartTotal : 0;
+      bl = `${S.ssLabel} 距離 km` + (S.ssDist > 0 ? `　残り ${km(Math.max(0, S.ssDist - ran))}` : '');
+      bv = km(Math.max(0, ran)); bc = 'var(--ok)'; bcls = 'run';
     }
   }
   box.className = 'panel' + (bl ? ' on ' + bcls : '');
@@ -640,6 +692,7 @@ function render(n){
     const html = `${S.tcLabel} チェックイン ${hm(a)}<small>${sub}${ciOverride != null ? '（補正中）' : ''}</small>`;
     if ($('ciBtn').innerHTML !== html) $('ciBtn').innerHTML = html;
     $('ciBtn').style.color = d == null || d === 0 ? 'var(--ok)' : 'var(--bad)';
+    $('ciBtn').classList.toggle('blink', tg != null && n >= tg && n < tg + 60000);
   }
   if (bl) {
     setText('ssBoxLab', bl); setText('ssBoxV', bv); $('ssBoxV').style.color = bc;
@@ -649,19 +702,21 @@ function render(n){
   $('strip').style.visibility = (bl && t == null) ? 'hidden' : '';
 
   // 距離
+  const ssRun = S.ssStart != null && S.ssFinish == null && n >= S.ssStart && n - S.ssStart < 3600e3;
   const iv = interShown();
-  const is = km(iv), ts = km(totalShown());
-  setText('inter', is); $('inter').classList.toggle('neg', S.interDown && iv < 0);
+  const is = ssRun ? stageTime(n - S.ssStart) : km(iv), ts = km(totalShown());
+  setText('inter', is); $('inter').classList.toggle('neg', !ssRun && S.interDown && iv < 0);
   setText('total', ts);
   // 桁数に合わせて文字を最大化（12.34なら5桁ぶん、123.45になったら6桁ぶん）
-  $('inter').style.setProperty('--ch', Math.max(is.length, 5));
+  $('inter').style.setProperty('--ch', Math.max(is.length, ssRun ? 6 : 5));
   $('total').style.setProperty('--ch', Math.max(ts.length, 5));
   setText('speed', String(Math.round(R.speed)));
-  setText('interLab', S.interDown ? 'INTER ▼ 残り km' : 'INTER km');
+  setText('interLab', ssRun ? `${S.ssLabel} タイム` : S.interDown ? 'INTER ▼ 残り km' : 'INTER km');
   $('badges').innerHTML = (S.frozen ? '<span class="badge">FREEZE</span>' : '') + (S.calibActive ? ' <span class="badge c">校正中</span>' : '');
   setText('stepL1', S.step + 'm'); setText('stepL2', S.step + 'm');
-  const ssRun = S.ssStart != null && S.ssFinish == null && n >= S.ssStart && n - S.ssStart < 3600e3;
   $('view-drive').classList.toggle('ssrun', ssRun);
+  const rb = ssRun ? 'SS<br>終了' : 'INTER<br>0';
+  if ($('rstInter').innerHTML !== rb) $('rstInter').innerHTML = rb;
 
 
   if (view === 'tc') renderTc(n);
@@ -679,9 +734,9 @@ function renderTc(n){
   if ($('swNextSs').innerHTML !== ns) $('swNextSs').innerHTML = ns;
   $('swNextSs').classList.toggle('on', S.nextIsSs);
   $('gapRow').style.display = S.nextIsSs ? '' : 'none'; setText('gapV', S.ssGap + '分');
-  const a = ciActual(); setText('ciV', hm(a));
-  if (t != null) { const d = Math.round((a - t) / 60000); setText('ciDiff', diffText(d)); $('ciDiff').style.color = d === 0 ? 'var(--ok)' : 'var(--bad)'; }
-  else setText('ciDiff', '');
+  setText('planSum', S.planIdx != null && S.plan[S.planIdx]
+    ? `使用中：${S.planIdx + 1} / ${S.plan.length}区間（次は ${S.plan[S.planIdx].l}）`
+    : S.plan.length ? `${S.plan.length}区間 入力済み（まだ使っていません）` : '');
   // SS
   const st = S.ssStart;
   let h = '';
@@ -750,7 +805,7 @@ document.querySelectorAll('#tabs button').forEach(b => b.addEventListener('click
   view = b.dataset.v;
   document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b));
   document.querySelectorAll('.view').forEach(v => v.classList.toggle('on', v.id === 'view-' + view));
-  if (view === 'tc') { fillTcInputs(); renderTc(now()); }
+  if (view === 'tc') { fillTcInputs(); renderTc(now()); if ($('planEd').style.display !== 'none') renderPlan(); }
   if (view === 'set') { renderRec(); $('factorIn').value = S.factor.toFixed(5); }
 }));
 
@@ -775,7 +830,10 @@ on('undoBtn', () => A.undo());
 on('ciBtn', () => { A.checkIn(); flash('ciBtn'); });
 on('ciMinus', () => { ciOverride = ciActual() - 60000; });
 on('ciPlus', () => { ciOverride = ciActual() + 60000; });
-$('rstInter').addEventListener('pointerdown', e => { e.preventDefault(); A.resetInter(); flash('rstInter'); });
+$('rstInter').addEventListener('pointerdown', e => {
+  e.preventDefault(); flash('rstInter');
+  if ($('view-drive').classList.contains('ssrun')) A.ssFinish(null, true); else A.resetInter();
+});
 // FREEZE・ロックは走行画面から外した（A.freeze と #lock は復活用に残してある）
 (() => { let h; const u = $('unlock');
   u.addEventListener('pointerdown', () => { h = setTimeout(() => { R.locked = false; $('lock').classList.remove('on'); vib(60); }, 800); });
@@ -801,8 +859,6 @@ on('nowStart', () => { const d = new Date(minFloor(now())); $('secH').value = p2
 on('swNextSs', () => { S.nextIsSs = !S.nextIsSs; save(); });
 on('gapM', () => { S.ssGap = Math.max(0, S.ssGap - 1); save(); });
 on('gapP', () => { S.ssGap = Math.min(30, S.ssGap + 1); save(); });
-on('ciM', () => { ciOverride = ciActual() - 60000; });
-on('ciP', () => { ciOverride = ciActual() + 60000; });
 on('ssSet', () => {
   const h = parseInt($('ssH').value), m = parseInt($('ssMi').value);
   if (!(h >= 0 && h <= 23 && m >= 0 && m <= 59)) return toast('時刻を確認してください');
@@ -834,6 +890,81 @@ on('ssDlgOk', () => {
   A.ssSetTime(dlgIdx, (m * 60 + sec) * 1000 + t * 100); closeSsDlg(); renderRec(); toast('タイムを記録しました');
 });
 on('swSsReset', () => { S.ssResetTrips = !S.ssResetTrips; save(); });
+
+// 区間表：目標時刻の差から各区間の所要時間を出す（SSの前は「SSまでの間隔」を引く）
+const tmOf = (h, m) => (h >= 0 && h <= 23 && m >= 0 && m <= 59) ? h * 60 + m : null;
+const tmText = tm => tm == null ? '' : p2(Math.floor(tm / 60)) + ':' + p2(tm % 60);
+function planDurs(){
+  let prev = S.planStart, prevSs = false;
+  return S.plan.map(r => {
+    let d = null;
+    if (prev != null && r.tm != null) { d = r.tm - prev - (prevSs ? S.ssGap : 0); d = ((d % 1440) + 1440) % 1440; }
+    prev = r.tm; prevSs = r.ss;
+    return d || null;
+  });
+}
+function applyPlan(){
+  const r = S.plan[S.planIdx];
+  if (!r) { S.planIdx = null; S.secDur = 0; return; }
+  S.tcLabel = r.l; S.secDur = planDurs()[S.planIdx] || 0; S.nextIsSs = r.ss;
+}
+function renderPlan(){
+  $('planSH').value = S.planStart != null ? p2(Math.floor(S.planStart / 60)) : '';
+  $('planSM').value = S.planStart != null ? p2(S.planStart % 60) : '';
+  $('planList').innerHTML = S.plan.map((r, i) => `<div class="row${i === S.planIdx ? ' cur' : ''}" data-i="${i}">
+    <span class="pl">${r.l}<span class="pdur"></span></span>
+    <input class="kp ph" type="text" readonly data-len="2" value="${r.tm != null ? p2(Math.floor(r.tm / 60)) : ''}">:<input class="kp pm" type="text" readonly data-len="2" value="${r.tm != null ? p2(r.tm % 60) : ''}">
+    <button class="b pss${r.ss ? ' on' : ''}">次SS</button>
+    <input class="kp pd" type="text" readonly data-dec="1" placeholder="km" value="${r.dist > 0 ? (r.dist / 1000).toFixed(2) : ''}" style="visibility:${r.ss ? 'visible' : 'hidden'}">
+    <button class="b pdel">×</button></div>`).join('');
+  planDurText();
+}
+function planDurText(){
+  const ds = planDurs();
+  document.querySelectorAll('#planList .row').forEach((e, i) => {
+    e.querySelector('.pdur').textContent = ds[i] ? `${ds[i]}分` : S.plan[i].tm != null ? '?' : '';
+  });
+}
+// 入力欄から表へ読み込む
+function planCollect(){
+  const h = parseInt($('planSH').value), m = parseInt($('planSM').value);
+  S.planStart = tmOf(h, m);
+  document.querySelectorAll('#planList .row').forEach(e => {
+    const r = S.plan[+e.dataset.i]; if (!r) return;
+    r.tm = tmOf(parseInt(e.querySelector('.ph').value), parseInt(e.querySelector('.pm').value));
+    const d = parseFloat(e.querySelector('.pd').value); r.dist = d > 0 && d < 100 ? Math.round(d * 1000) : 0;
+  });
+}
+on('planToggle', () => {
+  const open = $('planEd').style.display === 'none';
+  $('planEd').style.display = open ? '' : 'none'; setText('planToggle', open ? '閉じる' : '開く');
+  if (open) { if (!S.plan.length) S.plan.push({ l:S.tcLabel, tm:null, ss:false, dist:0 }); renderPlan(); }
+});
+on('planAdd', () => {
+  planCollect();
+  const last = S.plan.at(-1);
+  S.plan.push({ l:last ? nextLabel(last.l) : S.tcLabel, tm:null, ss:false, dist:0 });
+  save(); renderPlan();
+  openKp(document.querySelector('#planList .row:last-child .ph'));
+});
+$('planList').addEventListener('click', e => {
+  const row = e.target.closest('.row'); if (!row) return;
+  const i = +row.dataset.i;
+  if (e.target.classList.contains('pss')) { planCollect(); S.plan[i].ss = !S.plan[i].ss; if (S.planIdx === i) S.nextIsSs = S.plan[i].ss; save(); renderPlan(); }
+  if (e.target.classList.contains('pdel')) {
+    planCollect(); S.plan.splice(i, 1);
+    if (S.planIdx != null) { if (i < S.planIdx) S.planIdx--; else if (i === S.planIdx) applyPlan(); }
+    save(); renderPlan();
+  }
+});
+on('planGo', () => {
+  planCollect(); const ds = planDurs();
+  if (S.planStart == null) return toast('スタート時刻を入れてください');
+  const bad = ds.findIndex(d => !d);
+  if (!S.plan.length || bad >= 0) return toast(`${S.plan[bad]?.l ?? 'TC'} の目標時刻を確認してください`);
+  S.planIdx = 0; S.secStart = minuteToday(Math.floor(S.planStart / 60), S.planStart % 60); applyPlan();
+  save(); renderPlan(); fillTcInputs(); toast(`区間表で開始：${S.tcLabel} 目標 ${hm(targetMs())}`);
+});
 
 // 記録
 on('share', async () => {
@@ -900,23 +1031,34 @@ function closeKp(){
 function kpNext(){
   if (!kpEl) return;
   const scope = kpEl.closest('.row')?.parentElement || document;
-  const all = [...scope.querySelectorAll('input.kp')].filter(e => e.offsetParent);
+  const all = [...scope.querySelectorAll('input.kp')].filter(e => e.offsetParent && getComputedStyle(e).visibility !== 'hidden');
   const i = all.indexOf(kpEl);
-  if (i >= 0 && i < all.length - 1) openKp(all[i + 1]); else closeKp();
+  if (i >= 0 && i < all.length - 1) openKp(all[i + 1]); else { swallowClick(); closeKp(); }
+}
+function planEdited(){
+  planCollect(); planDurText();
+  if (S.planIdx != null) S.secDur = planDurs()[S.planIdx] || 0;
+  save();
 }
 function kpKey(k){
   const el = kpEl; if (!el) return;
-  if (k === 'done') return closeKp();
+  if (k === 'done') { swallowClick(); return closeKp(); }
   if (k === 'next') return kpNext();
-  if (k === 'bs') { el.dataset.fresh = ''; el.value = el.value.slice(0, -1); return; }
+  if (k === 'bs') { el.dataset.fresh = ''; el.value = el.value.slice(0, -1); if (el.closest('#planEd')) planEdited(); return; }
   if (el.dataset.fresh) { el.value = ''; el.dataset.fresh = ''; }
   if (k === '.' && (!el.dataset.dec || el.value.includes('.'))) return;
   const len = +el.dataset.len || 0;
   if (len && el.value.length >= len) return;
   el.value += k;
+  if (el.closest('#planEd')) planEdited();
   if (len && el.value.length >= len) kpNext();   // 時・分は2桁で次の欄へ
 }
-document.querySelectorAll('input.kp').forEach(el => el.addEventListener('pointerdown', e => { e.preventDefault(); openKp(el); }));
+// テンキーを閉じた直後の click は、テンキーの下にあったボタン（タブ等）に届いてしまうので捨てる
+let swallowUntil = 0;
+function swallowClick(){ swallowUntil = performance.now() + 500; }
+document.addEventListener('click', e => { if (performance.now() < swallowUntil) { e.preventDefault(); e.stopPropagation(); } }, true);
+// 入力欄（区間表のように後から増える欄も）を触ったらテンキーを開く
+document.addEventListener('pointerdown', e => { const el = e.target.closest('input.kp'); if (el) { e.preventDefault(); openKp(el); } });
 document.querySelectorAll('#kp button').forEach(b => b.addEventListener('pointerdown', e => { e.preventDefault(); vib(15); kpKey(b.dataset.k); }));
 // テンキーと入力欄以外を触ったら閉じる（ボタンの動作はそのまま）
 document.addEventListener('pointerdown', e => {
@@ -937,12 +1079,12 @@ async function goFull(){
   try { if (!document.fullscreenElement) await document.documentElement.requestFullscreen({ navigationUI:'hide' }); } catch (e) {}
   await lockOrient();
 }
-if (NATIVE) { try { $('verNote').textContent = 'ラリコン アプリ版 ' + NATIVE.version() + '（画面 Web版 0.5.4）'; } catch (e) {} }
+if (NATIVE) { try { $('verNote').textContent = 'ラリコン アプリ版 ' + NATIVE.version() + '（画面 Web版 0.6.0）'; } catch (e) {} }
 // 起動ロゴ：タップで飛ばせる・終わったら消す
 (() => { const sp = $('splash'); const end = () => sp.remove();
   sp.addEventListener('pointerdown', end); setTimeout(end, 2500); })();
 on('startBtn', async () => {
-  try { ac = new (window.AudioContext || window.webkitAudioContext)(); await ac.resume(); } catch (e) {}
+  try { ac = new (window.AudioContext || window.webkitAudioContext)(); await ac.resume(); loadVoice(); } catch (e) {}
   if ('speechSynthesis' in window) { const u = new SpeechSynthesisUtterance(''); speechSynthesis.speak(u); }
   $('start').classList.add('off');
   keepAwake();
