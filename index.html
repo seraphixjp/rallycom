@@ -78,6 +78,8 @@ button:active{background:#333}
 #ssDlg .dlg{background:var(--panel);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px;max-width:520px;width:100%}
 #ssDlg input{width:78px;font-size:30px;height:56px;text-align:center}
 #ssDlg .t{font-size:20px;font-weight:800}
+#ssDlgCourses .b{height:40px;font-size:14px}
+#ssDlgCourses input{width:140px;height:40px;font-size:16px}
 /* SS走行中はINTERまわりをSSカラー（緑）に */
 #view-drive.ssrun #inter,#view-drive.ssrun #rstInter{color:var(--ok)}
 #view-drive.ssrun #inter.neg{color:var(--bad)}
@@ -258,6 +260,8 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
     </div>
     <div class="card">
       <div class="row"><h3>SS</h3><input type="text" id="ssLabel" class="w"></div>
+      <div class="row"><span class="note">コース名</span><input type="text" id="ssCourse" style="width:200px;font-size:22px" placeholder="例：赤城"></div>
+      <div class="note">同じコースを2回目以降走る時は同じ名前にすると、前回のタイムと比べます（SS距離が前回と同じなら自動で同じコースにします）。</div>
       <div id="ssInfo"></div>
       <button class="b big" id="ssFin" style="display:none">SSを手動で終了（ふつうは止まると自動で終了）</button>
       <button class="b big okc" id="ssTimeBtn" style="display:none">SSタイムを入力</button>
@@ -281,8 +285,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
 
   <!-- 設定 -->
   <section id="view-set" class="view scroll">
-    <div class="card"><h3>記録：TC</h3><table id="tcTable"></table><div id="penalty" class="note" style="color:var(--warn)"></div></div>
-    <div class="card"><h3>記録：SS</h3><table id="ssTable"></table></div>
+    <div class="card"><h3>記録：SS（同じコースは前回のタイムと比べます）</h3><table id="ssTable"></table></div>
     <div class="row" style="margin-bottom:10px">
       <button class="b grow" id="share">記録を送る（LINE・メール等）</button>
       <button class="b badc" id="clearRec" data-long="clearRecords" data-hint="長押しで全消去">全消去（長押し）</button>
@@ -338,7 +341,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
     </div>
     <div class="card">
       <div class="note" id="gpsInfo"></div>
-      <div class="note" id="verNote">ラリコン Web版 0.6.0</div>
+      <div class="note" id="verNote">ラリコン Web版 0.6.1</div>
       <div class="note">音声：VOICEVOX:四国めたん</div>
     </div>
   </section>
@@ -360,6 +363,8 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
   <div class="t" id="ssDlgT"></div>
   <div class="row"><input class="kp" type="text" id="tM" placeholder="分" readonly data-len="2"><b>:</b><input class="kp" type="text" id="tS" placeholder="秒" readonly data-len="2"><b>.</b><input class="kp" type="text" id="tT" placeholder="0" readonly data-len="1"></div>
   <div class="note" id="ssDlgEst"></div>
+  <div class="row" id="ssDlgCourses"></div>
+  <div class="note" id="ssDlgCmp"></div>
   <div class="row"><button class="b grow" id="ssDlgLater">あとで</button><button class="b grow okc" id="ssDlgOk" style="height:56px;font-size:18px">記録</button></div>
 </div></div>
 <div id="kp">
@@ -391,6 +396,7 @@ const DEF = {
   plan:[],        // 区間表 [{l:'TC1', tm:目標(0時からの分), ss:次はSS, dist:SS距離(m)}]
   planStart:null, // 区間表のスタート時刻（0時からの分）
   planIdx:null,   // 区間表で次に向かうTCの番号（使っていない時はnull）
+  ssCourse:'',    // 次のSSのコース名（同じコースの前回タイムと比べる）
 };
 let S = JSON.parse(JSON.stringify(DEF));   // DEFの配列を共有しないようにコピー
 try { Object.assign(S, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
@@ -532,10 +538,12 @@ const A = {
   // SS終了（ストップで止まったら自動）。タイムは主催者に言われたものを後で入力
   ssFinish(at, manual){
     if (S.ssStart == null || S.ssFinish != null) return; const n = at ?? now(); if (n <= S.ssStart) return;
-    const snapSs = manual ? JSON.parse(JSON.stringify({ ssFinish:S.ssFinish, ssRecords:S.ssRecords, ssDist:S.ssDist, ssStartTotal:S.ssStartTotal, ssAwait:S.ssAwait, ssLabel:S.ssLabel })) : null;
+    const snapSs = manual ? JSON.parse(JSON.stringify({ ssFinish:S.ssFinish, ssRecords:S.ssRecords, ssDist:S.ssDist, ssStartTotal:S.ssStartTotal, ssAwait:S.ssAwait, ssLabel:S.ssLabel, ssCourse:S.ssCourse })) : null;
     const fin = Math.floor(n / 100) * 100;
-    S.ssFinish = fin; S.ssRecords.push({ l:S.ssLabel, s:S.ssStart, f:fin, t:null, by:S.ssDist > 0 ? 'dist' : 'stop' });
-    S.ssDist = 0; S.ssStartTotal = null;
+    const ranD = S.ssStartTotal != null ? Math.round(totalM() - S.ssStartTotal) : 0;
+    S.ssFinish = fin; S.ssRecords.push({ l:S.ssLabel, s:S.ssStart, f:fin, t:null, by:S.ssDist > 0 ? 'dist' : 'stop',
+      d:S.ssDist || ranD, c:S.ssCourse || guessCourse(S.ssDist || ranD) });
+    S.ssDist = 0; S.ssStartTotal = null; S.ssCourse = '';
     S.ssAwait = S.ssRecords.length - 1; S.ssLabel = nextLabel(S.ssLabel);
     // SS終了でINTERを0に（5秒間は元に戻せる）
     const snapI = { interRaw:S.interRaw, interAdj:S.interAdj, interDown:S.interDown, frozen:S.frozen };
@@ -775,24 +783,38 @@ function renderSet(){
   setText('gpsInfo', `欠測（トンネル・画面オフ等）：${S.gapCount}回　最高速 ${Math.round(R.maxSpeed)}km/h`);
 }
 
+// 同じコースの前回（タイム入力済み）の記録
+function prevRun(i, c){
+  const r = S.ssRecords[i]; c = c ?? (r && r.c); if (!c) return null;
+  for (let j = i - 1; j >= 0; j--) { const q = S.ssRecords[j]; if (q.c === c && q.t != null) return q; }
+  return null;
+}
+// 前回比（秒、0.1秒単位）。速くなったらマイナス
+const deltaText = ms => { const d = ms / 1000; return d === 0 ? '±0.0秒' : (d > 0 ? '+' : '−') + Math.abs(d).toFixed(1) + '秒'; };
+function cmpText(i){
+  const r = S.ssRecords[i], q = prevRun(i);
+  return q && r.t != null ? `前回 ${stageTime(q.t)}（${q.l}）→ ${deltaText(r.t - q.t)}` : '';
+}
+const cmpColor = i => { const r = S.ssRecords[i], q = prevRun(i); return q && r.t != null ? (r.t <= q.t ? 'var(--ok)' : 'var(--bad)') : 'var(--dim)'; };
+// SS距離が前回と同じ（±2%）ならそのコースとみなす
+function guessCourse(dist){
+  if (!(dist > 0)) return '';
+  for (let j = S.ssRecords.length - 1; j >= 0; j--) { const q = S.ssRecords[j]; if (q.c && q.d > 0 && Math.abs(q.d - dist) <= dist * 0.02) return q.c; }
+  return '';
+}
+const courses = () => [...new Set(S.ssRecords.map(r => r.c).filter(Boolean))];
 function renderRec(){
-  $('tcTable').innerHTML = S.tcRecords.length ? S.tcRecords.map((r, i) => {
-    const d = Math.round((r.a - r.t) / 60000);
-    return `<tr><td>${r.l}</td><td class="num">${hm(r.t)} → ${hm(r.a)}</td><td style="color:${d ? 'var(--bad)' : 'var(--ok)'};font-size:13px">${diffText(d)}</td><td><button class="b" data-del-tc="${i}">削除</button></td></tr>`;
+  $('ssTable').innerHTML = S.ssRecords.length ? S.ssRecords.map((r, i) => {
+    const head = `<td><b>${r.l}</b>${r.c ? `<br><span class="note">${r.c}</span>` : ''}</td>`;
+    const cmp = cmpText(i) ? `<br><span style="font-size:13px;color:${cmpColor(i)}">${cmpText(i)}</span>` : '';
+    return r.t != null
+      ? `<tr>${head}<td class="num" style="color:var(--ok);font-size:20px">${stageTime(r.t)}${cmp}<br><span class="note">目安 ${stageTime(r.f - r.s)}</span></td><td><button class="b" data-time-ss="${i}">修正</button> <button class="b" data-del-ss="${i}">削除</button></td></tr>`
+      : `<tr>${head}<td style="color:var(--amber)">未入力<br><span class="note">目安 ${stageTime(r.f - r.s)}</span></td><td><button class="b" data-time-ss="${i}">入力</button> <button class="b" data-del-ss="${i}">削除</button></td></tr>`;
   }).join('') : '<tr><td class="note">まだありません</td></tr>';
-  let late = 0, early = 0;
-  S.tcRecords.forEach(r => { const d = Math.round((r.a - r.t) / 60000); if (d > 0) late += d; else early -= d; });
-  $('penalty').textContent = (late + early) ? `ペナルティ計：遅着 ${late * 10}秒 ／ 早着 ${early}分　累積遅れ ${late}分（30分超で離脱）` : '';
-  $('ssTable').innerHTML = S.ssRecords.length ? S.ssRecords.map((r, i) => r.t != null
-    ? `<tr><td>${r.l}</td><td class="num" style="color:var(--ok);font-size:20px">${stageTime(r.t)}<br><span class="note">目安 ${stageTime(r.f - r.s)}</span></td><td><button class="b" data-time-ss="${i}">修正</button> <button class="b" data-del-ss="${i}">削除</button></td></tr>`
-    : `<tr><td>${r.l}</td><td style="color:var(--amber)">未入力<br><span class="note">目安 ${stageTime(r.f - r.s)}</span></td><td><button class="b" data-time-ss="${i}">入力</button> <button class="b" data-del-ss="${i}">削除</button></td></tr>`
-  ).join('') : '<tr><td class="note">まだありません</td></tr>';
 }
 function exportText(){
-  let s = 'ラリコン 記録\n補正係数 ' + S.factor.toFixed(5) + '\n\n[TC]\n';
-  S.tcRecords.forEach(r => s += `${r.l}  目標 ${hm(r.t)}  実際 ${hm(r.a)}  ${diffText(Math.round((r.a - r.t) / 60000))}\n`);
-  s += '\n[SS]\n';
-  S.ssRecords.forEach(r => s += `${r.l}  スタート ${hms(r.s)}  タイム ${r.t != null ? stageTime(r.t) : '未入力'}  目安 ${stageTime(r.f - r.s)}\n`);
+  let s = 'ラリコン SS記録\n\n';
+  S.ssRecords.forEach((r, i) => s += `${r.l}${r.c ? ' ' + r.c : ''}  タイム ${r.t != null ? stageTime(r.t) : '未入力'}  目安 ${stageTime(r.f - r.s)}${cmpText(i) ? '  ' + cmpText(i) : ''}\n`);
   return s;
 }
 
@@ -842,7 +864,7 @@ $('rstInter').addEventListener('pointerdown', e => {
 
 // TC
 function fillTcInputs(){
-  $('tcLabel').value = S.tcLabel; $('ssLabel').value = S.ssLabel;
+  $('tcLabel').value = S.tcLabel; $('ssLabel').value = S.ssLabel; $('ssCourse').value = S.ssCourse;
   if (S.secStart != null) { const d = new Date(S.secStart); $('secH').value = p2(d.getHours()); $('secM').value = p2(d.getMinutes()); } else { $('secH').value = ''; $('secM').value = ''; }
   $('secD').value = S.secDur > 0 ? S.secDur : '';
   $('ssDistIn').value = S.ssDist > 0 ? (S.ssDist / 1000).toFixed(2) : '';
@@ -850,6 +872,7 @@ function fillTcInputs(){
 }
 $('tcLabel').addEventListener('change', e => { S.tcLabel = e.target.value || 'TC'; save(); });
 $('ssLabel').addEventListener('change', e => { S.ssLabel = e.target.value || 'SS'; save(); });
+$('ssCourse').addEventListener('change', e => { S.ssCourse = e.target.value.trim(); save(); });
 on('setSection', () => {
   const h = parseInt($('secH').value), m = parseInt($('secM').value), d = parseInt($('secD').value) || 0;
   if (!(h >= 0 && h <= 23 && m >= 0 && m <= 59)) return toast('時刻を確認してください');
@@ -878,8 +901,21 @@ function openSsDlg(i){
   setText('ssDlgEst', `目安タイム：${stageTime(r.f - r.s)}（${r.by === 'dist' ? 'SS距離で判定' : '止まった時点'}）`);
   if (r.t != null) { const t = Math.round(r.t / 100); $('tM').value = Math.floor(t / 600); $('tS').value = Math.floor((t % 600) / 10); $('tT').value = t % 10; }
   else { $('tM').value = ''; $('tS').value = ''; $('tT').value = ''; }
+  dlgCourse = r.c || '';
+  renderDlgCourses();
   $('ssDlg').classList.add('on'); openKp($('tM'));
 }
+let dlgCourse = '';
+// コースのボタン（今までのコース名）＋新しい名前の欄
+function renderDlgCourses(){
+  const cs = courses(); if (dlgCourse && !cs.includes(dlgCourse)) cs.push(dlgCourse);
+  $('ssDlgCourses').innerHTML = '<span class="note">コース</span>' + cs.map(c => `<button class="b${c === dlgCourse ? ' sel' : ''}" data-course="${c}">${c}</button>`).join('')
+    + '<input type="text" id="ssDlgNew" placeholder="新しいコース名">';
+  const q = dlgCourse ? prevRun(dlgIdx, dlgCourse) : null;
+  setText('ssDlgCmp', q ? `前回（${q.l}）${stageTime(q.t)}` : dlgCourse ? 'このコースは初めて' : 'コースを選ぶと前回のタイムと比べます');
+}
+$('ssDlgCourses').addEventListener('click', e => { const c = e.target.dataset.course; if (c != null) { dlgCourse = c === dlgCourse ? '' : c; renderDlgCourses(); } });
+$('ssDlgCourses').addEventListener('change', e => { if (e.target.id === 'ssDlgNew' && e.target.value.trim()) { dlgCourse = e.target.value.trim(); renderDlgCourses(); } });
 function closeSsDlg(){ $('ssDlg').classList.remove('on'); dlgIdx = null; closeKp(); }
 on('ssBox', () => { if (S.ssAwait != null) openSsDlg(S.ssAwait); });
 on('ssTimeBtn', () => { if (S.ssAwait != null) openSsDlg(S.ssAwait); });
@@ -887,7 +923,11 @@ on('ssDlgLater', closeSsDlg);
 on('ssDlgOk', () => {
   const m = parseInt($('tM').value) || 0, sec = parseInt($('tS').value), t = parseInt($('tT').value) || 0;
   if (!(sec >= 0 && sec <= 59) || m < 0 || t < 0 || t > 9) return toast('タイムを確認してください（分・秒・1/10秒）');
-  A.ssSetTime(dlgIdx, (m * 60 + sec) * 1000 + t * 100); closeSsDlg(); renderRec(); toast('タイムを記録しました');
+  const nw = $('ssDlgNew') && $('ssDlgNew').value.trim(); if (nw) dlgCourse = nw;
+  const i = dlgIdx; S.ssRecords[i].c = dlgCourse;
+  A.ssSetTime(i, (m * 60 + sec) * 1000 + t * 100); closeSsDlg(); renderRec();
+  const q = prevRun(i);
+  toast(q ? `${dlgCourse} 前回比 ${deltaText(S.ssRecords[i].t - q.t)}` : 'タイムを記録しました');
 });
 on('swSsReset', () => { S.ssResetTrips = !S.ssResetTrips; save(); });
 
@@ -1079,7 +1119,7 @@ async function goFull(){
   try { if (!document.fullscreenElement) await document.documentElement.requestFullscreen({ navigationUI:'hide' }); } catch (e) {}
   await lockOrient();
 }
-if (NATIVE) { try { $('verNote').textContent = 'ラリコン アプリ版 ' + NATIVE.version() + '（画面 Web版 0.6.0）'; } catch (e) {} }
+if (NATIVE) { try { $('verNote').textContent = 'ラリコン アプリ版 ' + NATIVE.version() + '（画面 Web版 0.6.1）'; } catch (e) {} }
 // 起動ロゴ：タップで飛ばせる・終わったら消す
 (() => { const sp = $('splash'); const end = () => sp.remove();
   sp.addEventListener('pointerdown', end); setTimeout(end, 2500); })();
