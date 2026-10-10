@@ -138,10 +138,10 @@ input.kp.kpf{border-color:var(--amber);background:#1a1400}
 #kp button.ok{background:var(--amber);color:#000}
 @media (orientation:portrait){#kp{left:0;right:0;bottom:0;height:44vh;border-top:2px solid var(--line)}
   body.kpopen .scroll{padding-bottom:46vh}
-  body.kpopen #ssDlg{align-items:flex-start;padding-top:20px}}
+  #ssDlg{align-items:flex-start;padding-top:20px}}  /* テンキーを閉じてもダイアログが動かないよう常に上寄せ */
 @media (orientation:landscape){#kp{top:0;bottom:0;right:0;width:300px;border-left:2px solid var(--line)}
   body.kpopen .scroll{padding-right:312px}
-  body.kpopen #ssDlg{padding-right:312px}}
+  #ssDlg{padding-right:312px}}  /* 同じく常に左寄せ */
 input:focus{outline:none;border-color:var(--amber)}
 .note{font-size:13px;color:var(--dim);line-height:1.5}
 .big1{font-size:40px}.big2{font-size:28px}.big3{font-size:56px}
@@ -270,7 +270,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
       <div class="row">
         <span class="note">スタート時刻</span>
         <input class="kp" type="text" id="ssH" readonly data-len="2"> :
-        <input class="kp" type="text" id="ssMi" readonly data-len="2">
+        <input class="kp" type="text" id="ssMi" readonly data-len="2" data-end="1">
         <button class="b" id="ssSet">設定</button>
         <button class="b" id="ssClear">取消</button>
       </div>
@@ -343,7 +343,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
     </div>
     <div class="card">
       <div class="note" id="gpsInfo"></div>
-      <div class="note" id="verNote">ラリコン Web版 0.6.3</div>
+      <div class="note" id="verNote">ラリコン Web版 0.6.4</div>
       <div class="note">音声：VOICEVOX:四国めたん</div>
     </div>
   </section>
@@ -1065,9 +1065,18 @@ $('planList').addEventListener('click', e => {
   if (e.target.classList.contains('pss')) { planCollect(); S.plan[i].ss = !S.plan[i].ss; if (S.planIdx === i) S.nextIsSs = S.plan[i].ss;
     if (S.planIdx != null) S.secDur = planDurs()[S.planIdx] || S.secDur; save(); renderPlan(); }
   if (e.target.classList.contains('pdel')) {
-    planCollect(); S.plan.splice(i, 1);
-    if (S.planIdx != null) { if (i < S.planIdx) S.planIdx--; else if (i === S.planIdx) applyPlan(); }
+    // 通過済みのTCを消すと、今の区間の所要時間と番号が変わってしまう
+    if (S.planIdx != null && i < S.planIdx) return toast('通過済みのTCは消せません');
+    planCollect();
+    const snap = JSON.parse(JSON.stringify({ plan:S.plan, planIdx:S.planIdx, tcLabel:S.tcLabel, secDur:S.secDur, nextIsSs:S.nextIsSs }));
+    const gone = S.plan[i].l;
+    S.plan.splice(i, 1);
+    // 後ろのTCの番号を詰める（TC1・TC3 にならないように）。先頭を消した時は元の先頭の番号から
+    if (i === 0 && S.plan.length) S.plan[0].l = gone;
+    for (let j = Math.max(1, i); j < S.plan.length; j++) S.plan[j].l = nextLabel(S.plan[j - 1].l);
+    if (S.planIdx != null) { if (i < S.planIdx) S.planIdx--; if (i <= S.planIdx) applyPlan(); else if (S.plan[S.planIdx]) S.tcLabel = S.plan[S.planIdx].l; }
     save(); renderPlan();
+    showUndo(`${gone} を区間表から消しました`, () => { Object.assign(S, snap); renderPlan(); });
   }
 });
 on('planGo', () => {
@@ -1088,7 +1097,13 @@ on('share', async () => {
 $('view-set').addEventListener('click', e => {
   const t = e.target.dataset.delTc, s = e.target.dataset.delSs;
   if (t != null) { S.tcRecords.splice(+t, 1); save(); renderRec(); }
-  if (s != null) { S.ssRecords.splice(+s, 1); if (S.ssAwait != null) S.ssAwait = S.ssAwait === +s ? null : S.ssAwait > +s ? S.ssAwait - 1 : S.ssAwait; save(); renderRec(); }
+  if (s != null) {
+    const snap = JSON.parse(JSON.stringify({ ssRecords:S.ssRecords, ssAwait:S.ssAwait }));
+    const gone = S.ssRecords[+s];
+    S.ssRecords.splice(+s, 1); if (S.ssAwait != null) S.ssAwait = S.ssAwait === +s ? null : S.ssAwait > +s ? S.ssAwait - 1 : S.ssAwait;
+    save(); renderRec();
+    showUndo(`${gone.l} の記録を削除しました`, () => { Object.assign(S, snap); renderRec(); });
+  }
   const ti = e.target.dataset.timeSs; if (ti != null) openSsDlg(+ti);
 });
 
@@ -1132,12 +1147,13 @@ document.addEventListener('keydown', e => {
 let kpEl = null;
 function openKp(el){
   if (kpEl) kpEl.classList.remove('kpf');
-  kpEl = el; el.classList.add('kpf'); el.dataset.fresh = '1';
+  kpEl = el; el.classList.add('kpf'); el.dataset.fresh = '1'; kpCloseAfterTap = false;
   $('kpDot').style.visibility = el.dataset.dec ? '' : 'hidden';
   $('kp').classList.add('on'); document.body.classList.add('kpopen');
   setTimeout(() => el.scrollIntoView({ block:'center', behavior:'smooth' }), 30);
 }
 function closeKp(){
+  kpCloseAfterTap = false;
   if (kpEl) kpEl.classList.remove('kpf');
   kpEl = null; $('kp').classList.remove('on'); document.body.classList.remove('kpopen');
 }
@@ -1146,7 +1162,7 @@ function kpNext(){
   const scope = kpEl.closest('.row')?.parentElement || document;
   const all = [...scope.querySelectorAll('input.kp')].filter(e => e.offsetParent && getComputedStyle(e).visibility !== 'hidden');
   const i = all.indexOf(kpEl);
-  if (i >= 0 && i < all.length - 1) openKp(all[i + 1]); else { swallowClick(); closeKp(); }
+  if (i >= 0 && i < all.length - 1 && !kpEl.dataset.end) openKp(all[i + 1]); else kpCloseAfterTap = true;
 }
 function planEdited(){
   planCollect(); planDurText();
@@ -1156,7 +1172,7 @@ function planEdited(){
 }
 function kpKey(k){
   const el = kpEl; if (!el) return;
-  if (k === 'done') { swallowClick(); return closeKp(); }
+  if (k === 'done') { kpCloseAfterTap = true; return; }
   if (k === 'next') return kpNext();
   if (k === 'bs') { el.dataset.fresh = ''; el.value = el.value.slice(0, -1); if (el.closest('#planEd')) planEdited(); return; }
   if (el.dataset.fresh) { el.value = ''; el.dataset.fresh = ''; }
@@ -1167,23 +1183,27 @@ function kpKey(k){
   if (el.closest('#planEd')) planEdited();
   if (len && el.value.length >= len) kpNext();   // 時・分は2桁で次の欄へ
 }
-// テンキーを閉じた直後の click は、テンキーの下にあったボタン（タブ等）に届いてしまうので捨てる
-let swallowUntil = 0;
-function swallowClick(){ swallowUntil = performance.now() + 350; }
-document.addEventListener('click', e => { if (performance.now() < swallowUntil) { e.preventDefault(); e.stopPropagation(); } }, true);
 // 入力欄（区間表のように後から増える欄も）を触ったらテンキーを開く
 document.addEventListener('pointerdown', e => { const el = e.target.closest('input.kp'); if (el) { e.preventDefault(); openKp(el); } });
 document.querySelectorAll('#kp button').forEach(b => b.addEventListener('pointerdown', e => { e.preventDefault(); vib(15); kpKey(b.dataset.k); }));
-// テンキーと入力欄以外を触ったら閉じる（ボタンの動作はそのまま）
-document.addEventListener('pointerdown', e => {
+// テンキーと入力欄以外をタップしたら閉じる（ボタンの動作はそのまま）
+// 触れた瞬間（pointerdown）に閉じると画面が動いて、指を離した時には別の物の上になり、
+// 押したボタンが効かない・下のタブが押される、が起きる。タップが確定した click で閉じる
+document.addEventListener('click', e => {
   if (kpEl && !e.target.closest('#kp') && !e.target.closest('input.kp')) closeKp();
 }, true);
+// 「完了」や最後の欄を打ち終わった時も、そのキーの click が終わってから閉じる
+let kpCloseAfterTap = false;
+$('kp').addEventListener('click', () => { if (kpCloseAfterTap) closeKp(); });
 
 // ================= 起動 =================
 let wakeLock = null;
 async function keepAwake(){ try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {} }
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') { keepAwake(); if (ac && ac.state !== 'running') ac.resume().catch(() => {}); }
+  if (document.visibilityState === 'visible') {
+    keepAwake(); if (ac && ac.state !== 'running') ac.resume().catch(() => {});
+    if (NATIVE && $('start').classList.contains('off')) NATIVE.startTracking();
+  }
   else save();
 });
 // 向きの固定は全画面の時だけ効く（ホーム画面に追加したアプリは常に全画面）
@@ -1197,7 +1217,7 @@ async function goFull(){
   await lockOrient();
 }
 if (NATIVE) lockOrient();
-if (NATIVE) { try { $('verNote').textContent = 'ラリコン アプリ版 ' + NATIVE.version() + '（画面 Web版 0.6.3）'; } catch (e) {} }
+if (NATIVE) { try { $('verNote').textContent = 'ラリコン アプリ版 ' + NATIVE.version() + '（画面 Web版 0.6.4）'; } catch (e) {} }
 // 起動ロゴ：タップで飛ばせる・終わったら消す
 (() => { const sp = $('splash'); const end = () => sp.remove();
   sp.addEventListener('pointerdown', end); setTimeout(end, 2500); })();
