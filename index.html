@@ -178,6 +178,11 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
 #splash img{width:min(72vw,520px);height:auto;opacity:0;animation:splashLogo 2.2s ease forwards}
 @keyframes splashLogo{0%{opacity:0;transform:scale(.96)}30%{opacity:1;transform:scale(1)}70%{opacity:1}100%{opacity:0}}
 @keyframes splashBg{0%,90%{opacity:1}100%{opacity:0;visibility:hidden}}
+/* 全画面が外れて向きが変わった時の案内（タップで全画面＋向きの固定に戻す） */
+#refull{position:fixed;inset:0;z-index:55;background:rgba(0,0,0,.9);display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:24px}
+#refull.on{display:flex}
+#refull b{font-size:26px;color:var(--amber)}
+#refull span{font-size:15px;color:var(--dim)}
 #toast{position:fixed;left:50%;bottom:70px;transform:translateX(-50%);background:#333;color:#fff;padding:10px 16px;border-radius:8px;font-size:15px;z-index:30;opacity:0;transition:opacity .2s;pointer-events:none}
 #toast.on{opacity:1}
 #simBadge{position:fixed;left:8px;bottom:56px;background:var(--cyan);color:#000;font-size:12px;font-weight:700;padding:2px 6px;border-radius:4px;z-index:5;display:none}
@@ -343,7 +348,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
     </div>
     <div class="card">
       <div class="note" id="gpsInfo"></div>
-      <div class="note" id="verNote">ラリコン Web版 0.6.5</div>
+      <div class="note" id="verNote">ラリコン Web版 0.6.6</div>
       <div class="note">音声：VOICEVOX:四国めたん</div>
     </div>
   </section>
@@ -360,6 +365,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
   <button id="startBtn">計測を開始</button>
 </div>
 <div id="splash"><img src="seraphix-logo.png" alt="SERAPHIX"></div>
+<div id="refull"><b>画面をタップすると<br>向きを戻します</b><span>全画面が解除されたため、向きの固定が外れました</span></div>
 <div id="toast"></div>
 <div id="ssDlg"><div class="dlg">
   <div class="t" id="ssDlgT"></div>
@@ -1219,13 +1225,26 @@ async function goFull(){
 if (NATIVE) lockOrient();
 // 横（縦）固定が外れることがある：他のアプリから戻った・通知を引き出した・全画面が解除された等。
 // 画面に戻った時と、向きが違う状態でタップした時に固定し直す（Web版の全画面化はタップの中でしかできない）
-const orientWrong = () => S.orient !== 'any' && screen.orientation && !screen.orientation.type.startsWith(S.orient);
+// 実際の画面の縦横（画面の形で判断。screen.orientation は端末によって当てにならない）
+const orientWrong = () => S.orient !== 'any' && !matchMedia(`(orientation: ${S.orient})`).matches;
+// Web版（ブラウザで開いている時）：全画面が外れて向きが変わったら、タップを促す案内を出す
+// （ホーム画面に追加したアプリとして開いている時は全画面のままなので出さない）
+const isPwa = () => matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches;
+function checkRefull(){
+  const need = !NATIVE && !isPwa() && $('start').classList.contains('off') && matchMedia('(pointer:coarse)').matches
+    && !document.fullscreenElement && orientWrong();
+  $('refull').classList.toggle('on', need);
+}
+document.addEventListener('fullscreenchange', () => setTimeout(checkRefull, 300));
+addEventListener('resize', () => setTimeout(checkRefull, 300));
+document.addEventListener('visibilitychange', () => setTimeout(checkRefull, 500));
+$('refull').addEventListener('click', () => { goFull().then(() => setTimeout(checkRefull, 400)); $('refull').classList.remove('on'); });
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && $('start').classList.contains('off')) lockOrient(); });
 document.addEventListener('pointerup', () => {
   if (!$('start').classList.contains('off') || !orientWrong()) return;
   if (NATIVE) lockOrient(); else if (matchMedia('(pointer:coarse)').matches) goFull(); else lockOrient();
 }, true);
-if (NATIVE) { try { $('verNote').textContent = 'ラリコン アプリ版 ' + NATIVE.version() + '（画面 Web版 0.6.5）'; } catch (e) {} }
+if (NATIVE) { try { $('verNote').textContent = 'ラリコン アプリ版 ' + NATIVE.version() + '（画面 Web版 0.6.6）'; } catch (e) {} }
 // 起動ロゴ：タップで飛ばせる・終わったら消す
 (() => { const sp = $('splash'); const end = () => sp.remove();
   sp.addEventListener('pointerdown', end); setTimeout(end, 2500); })();
