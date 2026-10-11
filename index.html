@@ -343,7 +343,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
     </div>
     <div class="card">
       <div class="note" id="gpsInfo"></div>
-      <div class="note" id="verNote">ラリコン Web版 0.6.4</div>
+      <div class="note" id="verNote">ラリコン Web版 0.6.5</div>
       <div class="note">音声：VOICEVOX:四国めたん</div>
     </div>
   </section>
@@ -1217,7 +1217,15 @@ async function goFull(){
   await lockOrient();
 }
 if (NATIVE) lockOrient();
-if (NATIVE) { try { $('verNote').textContent = 'ラリコン アプリ版 ' + NATIVE.version() + '（画面 Web版 0.6.4）'; } catch (e) {} }
+// 横（縦）固定が外れることがある：他のアプリから戻った・通知を引き出した・全画面が解除された等。
+// 画面に戻った時と、向きが違う状態でタップした時に固定し直す（Web版の全画面化はタップの中でしかできない）
+const orientWrong = () => S.orient !== 'any' && screen.orientation && !screen.orientation.type.startsWith(S.orient);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && $('start').classList.contains('off')) lockOrient(); });
+document.addEventListener('pointerup', () => {
+  if (!$('start').classList.contains('off') || !orientWrong()) return;
+  if (NATIVE) lockOrient(); else if (matchMedia('(pointer:coarse)').matches) goFull(); else lockOrient();
+}, true);
+if (NATIVE) { try { $('verNote').textContent = 'ラリコン アプリ版 ' + NATIVE.version() + '（画面 Web版 0.6.5）'; } catch (e) {} }
 // 起動ロゴ：タップで飛ばせる・終わったら消す
 (() => { const sp = $('splash'); const end = () => sp.remove();
   sp.addEventListener('pointerdown', end); setTimeout(end, 2500); })();
