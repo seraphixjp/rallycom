@@ -363,7 +363,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
     </div>
     <div class="card">
       <div class="note" id="gpsInfo"></div>
-      <div class="note" id="verNote">INTER ZERO Web版 2.3.0</div>
+      <div class="note" id="verNote">INTER ZERO Web版 2.3.1</div>
       <div class="note">音声：VOICEVOX:四国めたん</div>
     </div>
   </section>
@@ -1345,7 +1345,7 @@ document.addEventListener('pointerup', () => {
   if (!$('start').classList.contains('off') || !orientWrong()) return;
   if (NATIVE) lockOrient(); else if (matchMedia('(pointer:coarse)').matches) goFull(); else lockOrient();
 }, true);
-if (NATIVE) { try { $('verNote').textContent = 'INTER ZERO アプリ版 ' + NATIVE.version() + '（画面 Web版 2.3.0）'; } catch (e) {} }
+if (NATIVE) { try { $('verNote').textContent = 'INTER ZERO アプリ版 ' + NATIVE.version() + '（画面 Web版 2.3.1）'; } catch (e) {} }
 // 起動ロゴ：タップで飛ばせる・終わったら消す
 (() => { const sp = $('splash'); const end = () => sp.remove();
   sp.addEventListener('pointerdown', end); setTimeout(end, 2500); })();
