@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#000000">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
-<title>ラリコン</title>
+<title>INTER ZERO</title>
 <style>
 :root{
   --bg:#000;--panel:#141414;--line:#2a2a2a;--btn:#1f1f1f;
@@ -348,7 +348,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
     </div>
     <div class="card">
       <div class="note" id="gpsInfo"></div>
-      <div class="note" id="verNote">ラリコン Web版 0.6.7</div>
+      <div class="note" id="verNote">INTER ZERO Web版 0.6.8</div>
       <div class="note">音声：VOICEVOX:四国めたん</div>
     </div>
   </section>
@@ -360,7 +360,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
 
 <div id="lock"><div id="unlock">ロック中<br>長押しで解除</div></div>
 <div id="start">
-  <div style="font-size:20px;font-weight:800">ラリコン</div>
+  <div style="font-size:24px;font-weight:800;letter-spacing:.06em">INTER ZERO</div>
   <div class="note">タップすると、位置情報・音・画面の点灯を有効にします</div>
   <button id="startBtn">計測を開始</button>
 </div>
@@ -483,7 +483,7 @@ function onPos(lat, lon, acc, speed, t){
       R.prevSpeed = v ?? 0;
     }
   } else R.prevSpeed = v ?? 0;
-  // この区間（前の測位〜今の測位）をラリコンの時計に直す
+  // この区間（前の測位〜今の測位）をアプリの時計に直す
   const off = (R.gpsOffset || 0) + S.manualOffset, tf = t + off, tp = p ? p.t + off : tf, dM = add * S.factor;
   const ssLive = S.ssStart != null && S.ssFinish == null && tf - S.ssStart < 3600e3;
   if (ssLive && S.ssStartTotal == null && tf >= S.ssStart) {
@@ -884,7 +884,7 @@ function renderRec(){
   }).join('') : '<tr><td class="note">まだありません</td></tr>';
 }
 function exportText(){
-  let s = 'ラリコン SS記録\n\n';
+  let s = 'INTER ZERO SS記録\n\n';
   S.ssRecords.forEach((r, i) => s += `${r.l}${r.c ? ' ' + r.c : ''}  タイム ${r.t != null ? stageTime(r.t) : '未入力'}  目安 ${stageTime(r.f - r.s)}${cmpText(i) ? '  ' + cmpText(i) : ''}\n`);
   return s;
 }
@@ -1247,7 +1247,7 @@ document.addEventListener('pointerup', () => {
   if (!$('start').classList.contains('off') || !orientWrong()) return;
   if (NATIVE) lockOrient(); else if (matchMedia('(pointer:coarse)').matches) goFull(); else lockOrient();
 }, true);
-if (NATIVE) { try { $('verNote').textContent = 'ラリコン アプリ版 ' + NATIVE.version() + '（画面 Web版 0.6.7）'; } catch (e) {} }
+if (NATIVE) { try { $('verNote').textContent = 'INTER ZERO アプリ版 ' + NATIVE.version() + '（画面 Web版 0.6.8）'; } catch (e) {} }
 // 起動ロゴ：タップで飛ばせる・終わったら消す
 (() => { const sp = $('splash'); const end = () => sp.remove();
   sp.addEventListener('pointerdown', end); setTimeout(end, 2500); })();
