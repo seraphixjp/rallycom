@@ -44,6 +44,8 @@ button:active{background:#333}
 /* SSスタート待ち（ARM方式：1分前を切ったらINTERの枠をタップ→次の00秒でスタート）
    INTERの枠がスタートボタン、速度は消してカウントダウンを縦いっぱいに */
 #ctrl.ss #ciBtn{display:none}
+/* リグループOUTの間は±1分が「OUT時刻」を動かすので、横画面でも小さい説明を出す */
+#ctrl.rg #ciMinus small,#ctrl.rg #ciPlus small{display:block;color:var(--amber)}
 #view-drive.sswait #interP{cursor:pointer;border:3px solid var(--amber)}
 #view-drive.sswait.armed #interP{border-color:var(--ok)}
 #view-drive.sswait #interP:active{background:#2a2a2a}
@@ -178,6 +180,12 @@ table{width:100%;border-collapse:collapse;font-size:15px}
 #planList input.pd{width:90px;font-size:22px}
 #planList .pdrow{padding-left:51px}
 #planList .pdrow.off{display:none}
+#planList .pkrow{padding-left:51px}
+#planList .pk,#planList .pe{height:40px;padding:0 10px;font-size:13px}
+#planList .pk.sv{background:var(--cyan);color:#000}
+#planList .pk.rg{background:var(--amber);color:#000}
+#planList .pe.on{background:var(--ok);color:#000}
+#planList .pl .pkind{font-size:10px;font-weight:700}
 #planList .pl{width:48px;font-size:15px;font-weight:700;flex:0 0 auto;display:flex;flex-direction:column;line-height:1.2}
 #planList .pss{height:50px;width:48px;padding:0;font-size:13px;flex:0 0 auto}
 #planList .pss.on{background:var(--ok);color:#000}
@@ -265,7 +273,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
       <div class="row"><h3 class="grow">区間表（TCの目標時刻をまとめて入力）</h3><button class="b" id="planToggle">開く</button></div>
       <div id="planSum" class="note"></div>
       <div id="planEd" style="display:none">
-        <div class="note">タイムカード・アイテナリーの目標時刻を、スタート（TC0）から順に入れるだけです。時刻の差を各区間の所要時間として使うので、遅着しても次からの目標は正しくずれます（先頭車の時刻のままでも、TC0だけ自分の時刻にすれば使えます）。「次SS」はそのTCの次がSSのとき。押すとSS距離の欄が出ます（自動終了に使います）。</div>
+        <div class="note">タイムカード・アイテナリーの目標時刻を、スタート（TC0）から順に入れるだけです。時刻の差を各区間の所要時間として使うので、遅着しても次からの目標は正しくずれます（先頭車の時刻のままでも、TC0だけ自分の時刻にすれば使えます）。「次SS」はそのTCの次がSSのとき。押すとSS距離の欄が出ます（自動終了に使います）。<br>種類：サービス明けのTC（例 TC4B）は「サービスOUT」、リグループ明けのTC（例 TC4C）は「リグループOUT」。リグループOUTの時刻は、INで指示された時刻を走行画面の±1分で合わせます。「早着OK」は特別規則書で早着ペナルティが無いと書かれたTC（最終TCなど）に付けます。</div>
         <div id="planList"></div>
         <div class="row" style="margin-top:8px"><button class="b grow" id="planAdd">＋ TCを追加</button></div>
         <div class="row"><button class="b grow okc" id="planGo" style="height:56px">この表で開始</button><button class="b badc" id="planClear" data-long="planClear" data-hint="長押しで表を消す">表を消す</button></div>
@@ -368,7 +376,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
     </div>
     <div class="card">
       <div class="note" id="gpsInfo"></div>
-      <div class="note" id="verNote">INTER ZERO Web版 2.3.4</div>
+      <div class="note" id="verNote">INTER ZERO Web版 2.4.0</div>
       <div class="note">音声：VOICEVOX:四国めたん</div>
     </div>
   </section>
@@ -448,6 +456,10 @@ const interM = () => S.interRaw * S.factor + S.interAdj;
 const totalM = () => S.totalRaw * S.factor + S.totalAdj;
 function interShown(){ const v = S.frozen ? S.frozenInter : interM(); return S.interDown ? S.interTarget - v : v; }
 const totalShown = () => S.frozen ? S.frozenTotal : totalM();
+// 区間表で今向かっているTCの行（種類 k：tc／sv＝サービスOUT／rg＝リグループOUT、early：早着OK）
+const curRow = () => S.planIdx != null ? S.plan[S.planIdx] || null : null;
+const curKind = () => (curRow() || {}).k || 'tc';
+const KIND = { tc:'TC', sv:'サービスOUT', rg:'リグループOUT' };
 const targetMs = () => (S.secStart != null && S.secDur > 0) ? S.secStart + S.secDur * 60000 : null;
 // アプリ版の中で動いている時は、GPS・GPS時刻・音声・バイブ・共有・画面の向きをアプリ側に任せる
 const NATIVE = window.RallyNative || null;
@@ -610,7 +622,9 @@ const A = {
     // 区間表を使っていれば次のTCの所要時間を自動で入れる
     if (row) { S.planIdx++; applyPlan(); }
     ciDelta = 0; save(); vib(60);
-    showUndo(`${S.tcRecords.at(-1).l} ${hm(actual)} でチェックイン`, () => { Object.assign(S, snap); lastSsCue = Infinity; ciDelta = actual - minFloor(now()); });
+    const rgMsg = row && curKind() === 'rg' && targetMs() ? `／${S.tcLabel} ${hm(targetMs())}（指示と違えば±1分）` : '';
+    if (rgMsg) say('リグループアウトの時刻を確認してください');
+    showUndo(`${S.tcRecords.at(-1).l} ${hm(actual)} でチェックイン${rgMsg}`, () => { Object.assign(S, snap); lastSsCue = Infinity; ciDelta = actual - minFloor(now()); });
   },
   // SSスタート（ARM方式）：スタート1分前を切ったら押す→次の00秒をスタート時刻にする
   // 00秒を過ぎて2秒以内に押した時は「今スタートした」とみなしてその分に
@@ -695,7 +709,7 @@ function say(t){
 const vib = ms => { if (NATIVE) NATIVE.vibrate(ms); else if (navigator.vibrate) navigator.vibrate(ms); };
 
 // ================= 毎100ms =================
-let lastSsCue = Infinity, zoneCued = 0, targetCued = 0, gpsLostCued = false, stillSince = null;
+let lastSsCue = Infinity, zoneCued = 0, targetCued = 0, outCued = 0, gpsLostCued = false, stillSince = null;
 function tick(){
   const n = now();
   // SSカウントダウン
@@ -722,6 +736,8 @@ function tick(){
   // TC
   const t = targetMs();
   if (t != null) {
+    const kd = curKind();
+    if (kd !== 'tc' && n >= t - 300000 && n < t - 295000 && outCued !== t) { outCued = t; beep(880, 300); say(kd === 'sv' ? 'サービスアウトまで5分です' : 'リグループアウトまで5分です'); }
     if (n >= t - 60000 && n < t - 55000 && zoneCued !== t) { zoneCued = t; beep(880, 300); say('目標の1分前です。ゾーンにはいれます'); }
     if (n >= t && n < t + 5000 && targetCued !== t) { targetCued = t; beep(1200, 400); vib(300); say('目標時刻です'); }
   }
@@ -744,14 +760,14 @@ function tcStatus(n, t){
 }
 // 大きい枠用：[数字, ラベル, 色]。数字は桁だけ（枠いっぱいに出すため）
 function tcBigText(n, t){
-  if (n < t - 60000) return [mmss(t - n), 'まで', 'var(--fg)'];
+  if (n < t - 60000) return [mmss(t - n), (curRow() || {}).early ? 'まで（早着OK）' : 'まで', 'var(--fg)'];
   if (n < t) return [mmss(t - n), 'まで ゾーン可', 'var(--ok)'];
   if (n < t + 60000) return ['0:' + p2(Math.floor((t + 60000 - n) / 1000)), '今なら定刻 残り', 'var(--ok)'];
   return ['+' + mmss(t - n).replace('+', ''), `遅着 ${Math.floor((n - t) / 60000)}分`, 'var(--bad)'];
 }
 // 上の帯用の短い状況
 function tcWord(n, t){
-  if (n < t - 60000) return ['', 'var(--fg)'];
+  if (n < t - 60000) return [(curRow() || {}).early ? '早着OK' : '', 'var(--ok)'];
   if (n < t) return ['ゾーン可', 'var(--ok)'];
   if (n < t + 60000) return ['今なら定刻', 'var(--ok)'];
   return ['遅着 ' + Math.floor((n - t) / 60000) + '分', 'var(--bad)'];
@@ -795,7 +811,9 @@ function render(n){
 
   // 次のTCまでの時間：右の列の一番上に大きく。止まって5秒（TCの調整待ち）、または枠をタップでINTERの枠いっぱいに
   const tcShow = t != null && !ssNear;
-  const autoBig = tcShow && R.stopAt != null && n - R.stopAt > 5000 && t - n <= 300000 && n < t + 60000 && !R.tcAutoOff;
+  // サービス・リグループの間は止まっていれば最初から大きく（車外で作業していても見える）
+  const kd = curKind();
+  const autoBig = tcShow && R.stopAt != null && n - R.stopAt > 5000 && (kd !== 'tc' || t - n <= 300000) && n < t + 60000 && !R.tcAutoOff;
   const tcBig = tcShow && (R.tcPin || autoBig);
   if (!tcShow) R.tcPin = false;
   const [tv, tlab, tc] = tcShow ? tcBigText(n, t) : ['', '', ''];
@@ -803,7 +821,7 @@ function render(n){
   $('tcP').classList.toggle('on', tcShow);
   if (tcShow) {
     const sv = tcBig ? km(interShown()) : tv;
-    setText('tcLab', tcBig ? 'INTER km' : `${S.tcLabel} ${tlab}`); setText('tcV', sv);
+    setText('tcLab', tcBig ? 'INTER km' : `${S.tcLabel} ${kd !== 'tc' ? KIND[kd] : ''}${tlab}`); setText('tcV', sv);
     $('tcV').style.color = tcBig ? 'var(--amber)' : tc;
     $('tcV').style.setProperty('--ch', Math.max(sv.length, tcBig ? 5 : 4));
   }
@@ -830,16 +848,19 @@ function render(n){
   const ssCtl = ssPend || ssCount;
   $('ctrl').classList.toggle('off', ssRun);
   $('ctrl').classList.toggle('ss', ssCtl);
-  setText('ciMinusL', ssCtl ? 'スタート' : 'チェックイン'); setText('ciPlusL', ssCtl ? 'スタート' : 'チェックイン');
+  const pmL = ssCtl ? 'スタート' : kd === 'rg' && t != null ? 'OUT時刻' : 'チェックイン';
+  setText('ciMinusL', pmL); setText('ciPlusL', pmL);
+  $('ctrl').classList.toggle('rg', pmL === 'OUT時刻');
   $('view-drive').classList.toggle('sswait', ssCtl);
   $('view-drive').classList.toggle('armed', ssCount);
   if (!ssCtl && !ssRun) {
     const a = ciActual();
     const d = t != null ? Math.round((a - t) / 60000) : null;
-    const sub = d == null ? '目標未設定' : d === 0 ? '定刻' : d > 0 ? `遅着 ${d}分` : `早着 ${-d}分`;
+    const eok = (curRow() || {}).early && d < 0;
+    const sub = d == null ? '目標未設定' : d === 0 ? '定刻' : d > 0 ? `遅着 ${d}分` : eok ? '早着OK（ペナなし）' : `早着 ${-d}分`;
     const html = `${S.tcLabel} チェックイン ${hm(a)}<small>${sub}${ciDelta ? '（補正中）' : ''}</small>`;
     if ($('ciBtn').innerHTML !== html) $('ciBtn').innerHTML = html;
-    $('ciBtn').style.color = d == null || d === 0 ? 'var(--ok)' : 'var(--bad)';
+    $('ciBtn').style.color = d == null || d === 0 || eok ? 'var(--ok)' : 'var(--bad)';
     $('ciBtn').classList.toggle('blink', t != null && n >= t && n < t + 60000);
   }
   if (bl) {
@@ -860,8 +881,9 @@ function render(n){
   $('inter').style.setProperty('--ch', ssCtl ? 8.5 : Math.max(is.length, tcBig ? 4 : 5));
   $('total').style.setProperty('--ch', Math.max(ts.length, 5));
   setText('speed', String(Math.round(R.speed)));
+  const kdl = tcBig && kd !== 'tc' ? KIND[kd] + ' ' : '';
   setText('interLab', ssCtl ? (ssPend ? `${S.ssLabel} 予定 ${hm(S.ssStart)}（タップで次の00秒にスタート）`
-      : `${S.ssLabel} スタート ${hms(S.ssStart)}（もう一度押すとSTANDBYに戻る）`) : tcBig ? `${S.tcLabel} 目標 ${hm(t)}　${tlab}（タップで距離に戻す）`
+      : `${S.ssLabel} スタート ${hms(S.ssStart)}（もう一度押すとSTANDBYに戻る）`) : tcBig ? `${S.tcLabel} ${kdl}目標 ${hm(t)}　${tlab}（タップで距離に戻す）`
     : (ssRun ? `${S.ssLabel} ` : '') + (S.interDown ? 'INTER ▼ 残り km' : 'INTER km'));
   $('badges').innerHTML = (S.frozen ? '<span class="badge">FREEZE</span>' : '') + (S.calibActive ? ' <span class="badge c">校正中</span>' : '');
   setText('stepL1', S.step + 'm'); setText('stepL2', S.step + 'm');
@@ -1015,8 +1037,11 @@ on('undoBtn', () => A.undo());
 // 走行画面のTCチェックイン：1タップ＋5秒間「元に戻す」
 on('ciBtn', () => { A.checkIn(); flash('ciBtn'); });
 // ±1分：ふだんはチェックイン時刻、SSのスタート待ちの間はスタート時刻
-on('ciMinus', () => { if ($('ctrl').classList.contains('ss')) A.ssShift(-60000); else ciDelta -= 60000; });
-on('ciPlus', () => { if ($('ctrl').classList.contains('ss')) A.ssShift(60000); else ciDelta += 60000; });
+// リグループOUT：INで指示された時刻に合わせる（今の区間の所要時間を1分ずつ）
+function rgShift(m){ S.secDur = Math.max(1, S.secDur + m); save(); toast(`${S.tcLabel} OUT ${hm(targetMs())}`); }
+const rgNow = () => curKind() === 'rg' && targetMs() != null;
+on('ciMinus', () => { if ($('ctrl').classList.contains('ss')) A.ssShift(-60000); else if (rgNow()) rgShift(-1); else ciDelta -= 60000; });
+on('ciPlus', () => { if ($('ctrl').classList.contains('ss')) A.ssShift(60000); else if (rgNow()) rgShift(1); else ciDelta += 60000; });
 // 次のTCまでの時間：小さい枠をタップで大きく、大きい方をタップで距離に戻す（動き出すまで自動では大きくしない）
 on('tcP', () => { if ($('view-drive').classList.contains('tcbig')) { R.tcPin = false; R.tcAutoOff = true; } else R.tcPin = true; });
 on('interP', () => {
@@ -1138,10 +1163,11 @@ function renderPlan(){
     <span class="pl">TC0<span class="pdur">スタート</span></span>
     <input class="kp" type="text" id="planSH" readonly data-len="2" value="${st != null ? p2(Math.floor(st / 60)) : ''}">:<input class="kp" type="text" id="planSM" readonly data-len="2" value="${st != null ? p2(st % 60) : ''}"></div></div>`
     + S.plan.map((r, i) => `<div class="prow${i === S.planIdx ? ' cur' : ''}" data-i="${i}"><div class="row">
-    <span class="pl">${r.l}<span class="pdur"></span></span>
+    <span class="pl">${r.l}<span class="pdur"></span><span class="pkind">${r.k && r.k !== 'tc' ? KIND[r.k] : ''}</span></span>
     <input class="kp ph" type="text" readonly data-len="2" value="${r.tm != null ? p2(Math.floor(r.tm / 60)) : ''}">:<input class="kp pm" type="text" readonly data-len="2" value="${r.tm != null ? p2(r.tm % 60) : ''}">
     <button class="b pss${r.ss ? ' on' : ''}">次SS</button>
     <button class="b pdel">×</button></div>
+    <div class="row pkrow"><button class="b pk ${r.k || 'tc'}">${KIND[r.k || 'tc']}</button><button class="b pe${r.early ? ' on' : ''}">早着OK</button></div>
     <div class="row pdrow${r.ss ? '' : ' off'}"><span class="note">SS距離</span><input class="kp pd" type="text" readonly data-dec="1" placeholder="km" value="${r.dist > 0 ? (r.dist / 1000).toFixed(2) : ''}"><span class="note">km</span></div></div>`).join('');
   planDurText();
 }
@@ -1176,6 +1202,9 @@ on('planAdd', () => {
 $('planList').addEventListener('click', e => {
   const row = e.target.closest('.prow[data-i]'); if (!row) return;
   const i = +row.dataset.i;
+  // 種類：TC → サービスOUT → リグループOUT → TC
+  if (e.target.classList.contains('pk')) { planCollect(); const r = S.plan[i]; r.k = { tc:'sv', sv:'rg', rg:'tc' }[r.k || 'tc']; save(); renderPlan(); }
+  if (e.target.classList.contains('pe')) { planCollect(); S.plan[i].early = !S.plan[i].early; save(); renderPlan(); }
   if (e.target.classList.contains('pss')) { planCollect(); S.plan[i].ss = !S.plan[i].ss; if (S.planIdx === i) S.nextIsSs = S.plan[i].ss;
     if (S.planIdx != null) S.secDur = planDurs()[S.planIdx] || S.secDur; save(); renderPlan(); }
   if (e.target.classList.contains('pdel')) {
@@ -1355,7 +1384,7 @@ document.addEventListener('pointerup', () => {
   if (!$('start').classList.contains('off') || !orientWrong()) return;
   if (NATIVE) lockOrient(); else if (matchMedia('(pointer:coarse)').matches) goFull(); else lockOrient();
 }, true);
-if (NATIVE) { try { $('verNote').textContent = 'INTER ZERO アプリ版 ' + NATIVE.version() + '（画面 Web版 2.3.4）'; } catch (e) {} }
+if (NATIVE) { try { $('verNote').textContent = 'INTER ZERO アプリ版 ' + NATIVE.version() + '（画面 Web版 2.4.0）'; } catch (e) {} }
 // 起動ロゴ：タップで飛ばせる・終わったら消す
 (() => { const sp = $('splash'); const end = () => sp.remove();
   sp.addEventListener('pointerdown', end); setTimeout(end, 2500); })();

@@ -157,7 +157,7 @@ async function tap(sel){
 async function keys(str){ for (const k of str) await tap(`#kp button[data-k="${k}"]`); }
 
 // ---------- 字幕 ----------
-const SCENES = 11;
+const SCENES = 12;
 function cap(no, t, b){ $('capNo').textContent = no ? `${no} / ${SCENES}` : ''; $('capT').textContent = t; $('capB').innerHTML = b; $('barIn').style.width = (no / SCENES * 100) + '%'; skipping = false; }
 
 // ---------- 初期状態 ----------
@@ -222,19 +222,35 @@ async function run(){
     const mm = String(Math.floor(t / 600)).padStart(2, '0'), ss = String(Math.floor(t % 600 / 10)).padStart(2, '0');
     await keys(mm + ss + (t % 10)); await wait(1500); await tap('#ssDlgOk'); await wait(3500);
 
-    cap(9, '区間表', 'タイムカードの<b>目標時刻を入れておくだけ</b>。各区間の所要時間に直し、チェックインのたびに<b>次のTCへ自動で進みます</b>。遅着しても次の目標は正しくずれます。');
+    cap(9, 'サービス・リグループ', '区間表でサービス明けのTCを<b>「サービスOUT」</b>にしておくと、止まっている間は<b>OUTまでの残り時間を画面いっぱい</b>に出し、<b>5分前に音声</b>でお知らせ。リグループでは<b>INで指示されたOUT時刻</b>を下の±1分で合わせます。最終TCなど<b>早着OK</b>のTCは早着ペナルティを出しません。');
+    {
+      // サービス：TC4A IN → 30分 → TC4B サービスOUT＝リグループIN → 15分 → TC4C リグループOUT → TC5（早着OK）
+      const S = D.S, d = new Date(V()), m = d.getHours() * 60 + d.getMinutes(), m0 = Math.floor(V() / 60000) * 60000;
+      Object.assign(S, { planStart:m - 40, planIdx:1, tcLabel:'TC4B', secStart:m0, secDur:30, nextIsSs:false, ssAwait:null,
+        plan:[{ l:'TC4A', tm:m, ss:false, dist:0 }, { l:'TC4B', tm:m + 30, ss:false, dist:0, k:'sv' },
+              { l:'TC4C', tm:m + 45, ss:false, dist:0, k:'rg' }, { l:'TC5', tm:m + 75, ss:false, dist:0, early:true }] });
+      D.hideUndo(); D.save(); car.target = 0;
+      await until(() => W.document.getElementById('view-drive').classList.contains('tcbig')); ring('#interP'); await wait(5000);
+      jumpTo(m0 + 30 * 60000 - 302000); await wait(4500);              // 5分前の音声
+      jumpTo(m0 + 30 * 60000 + 3000); ring('#ciBtn'); await wait(2000);  // OUTの時刻
+      await tap('#ciBtn'); ring('#undo'); await wait(3500);
+      ring('#ciPlus'); await tap('#ciPlus'); await wait(1200); await tap('#ciMinus'); await wait(2500); ring(null);
+    }
+
+    cap(10, '区間表', 'タイムカードの<b>目標時刻を入れておくだけ</b>。各区間の所要時間に直し、チェックインのたびに<b>次のTCへ自動で進みます</b>。遅着しても次の目標は正しくずれます。');
     car.target = 12; await tap('#tabs button[data-v="tc"]'); await wait(300);
     if (W.document.getElementById('planEd').style.display === 'none') await tap('#planToggle');
     W.document.getElementById('planEd').scrollIntoView({ block:'start' }); await wait(300); ring('#planList'); await wait(6500);
 
-    cap(10, '記録', 'SSの記録は<b>同じコースの前回比つき</b>で一覧に。LINEやメールでそのまま送れます。');
+    cap(11, '記録', 'SSの記録は<b>同じコースの前回比つき</b>で一覧に。LINEやメールでそのまま送れます。');
     ring(null); await tap('#tabs button[data-v="set"]'); await wait(300); ring('#ssTable'); await wait(6000);
 
     ring(null); await tap('#tabs button[data-v="drive"]');
-    cap(11, 'まとめ', `<ul class="sum">
+    cap(12, 'まとめ', `<ul class="sum">
       <li><b>見やすさ</b>：数字は画面いっぱい・横画面標準・必要な情報だけ</li>
       <li><b>押し間違いに強い</b>：大きなボタン、すべての操作を5秒間「元に戻す」</li>
       <li><b>TC・SSの自動化</b>：区間表・JAF規定の判定・SSの自動スタート/終了</li>
+      <li><b>サービス・リグループ</b>：OUTまでの残りを大きく・指示されたOUT時刻に合わせる・早着OKのTC</li>
       <li><b>距離のビープ</b>：500mごと。レッキの距離メモ・ロストからの復帰に</li>
       <li><b>アプリ版</b>：画面を消しても計測を継続、GPS時刻、オフラインで動作</li></ul>
       <p style="margin:10px 0 0;color:var(--dim);font-size:14px">「自分で触る」で画面を操作できます。</p>`);
