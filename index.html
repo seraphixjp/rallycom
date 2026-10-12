@@ -376,7 +376,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
     </div>
     <div class="card">
       <div class="note" id="gpsInfo"></div>
-      <div class="note" id="verNote">INTER ZERO Web版 2.4.1</div>
+      <div class="note" id="verNote">INTER ZERO Web版 2.4.2</div>
       <div class="note">音声：VOICEVOX:四国めたん</div>
     </div>
   </section>
@@ -1332,12 +1332,15 @@ function kpKey(k){
   if (len && el.value.length >= len) kpNext();   // 時・分は2桁で次の欄へ
 }
 // 入力欄（区間表のように後から増える欄も）を触ったらテンキーを開く
-document.addEventListener('pointerdown', e => { const el = e.target.closest('input.kp'); if (el) { e.preventDefault(); openKp(el); } });
+// テンキーを開いたタップ自身の click は無視する（テンキーや画面のずれで指の下が入力欄でなくなると、開いた直後に閉じてしまう）
+let kpOpenTap = false;
+document.addEventListener('pointerdown', e => { const el = e.target.closest('input.kp'); kpOpenTap = !!el; if (el) { e.preventDefault(); openKp(el); } });
 document.querySelectorAll('#kp button').forEach(b => b.addEventListener('pointerdown', e => { e.preventDefault(); vib(15); kpKey(b.dataset.k); }));
 // テンキーと入力欄以外をタップしたら閉じる（ボタンの動作はそのまま）
 // 触れた瞬間（pointerdown）に閉じると画面が動いて、指を離した時には別の物の上になり、
 // 押したボタンが効かない・下のタブが押される、が起きる。タップが確定した click で閉じる
 document.addEventListener('click', e => {
+  if (kpOpenTap) { kpOpenTap = false; if (!e.target.closest('input.kp')) { e.preventDefault(); e.stopPropagation(); } return; }
   if (kpEl && !e.target.closest('#kp') && !e.target.closest('input.kp')) closeKp();
 }, true);
 // 「完了」や最後の欄を打ち終わった時も、そのキーの click が終わってから閉じる
@@ -1386,7 +1389,7 @@ document.addEventListener('pointerup', () => {
   if (!$('start').classList.contains('off') || !orientWrong()) return;
   if (NATIVE) lockOrient(); else if (matchMedia('(pointer:coarse)').matches) goFull(); else lockOrient();
 }, true);
-if (NATIVE) { try { $('verNote').textContent = 'INTER ZERO アプリ版 ' + NATIVE.version() + '（画面 Web版 2.4.1）'; } catch (e) {} }
+if (NATIVE) { try { $('verNote').textContent = 'INTER ZERO アプリ版 ' + NATIVE.version() + '（画面 Web版 2.4.2）'; } catch (e) {} }
 // 起動ロゴ：タップで飛ばせる・終わったら消す
 (() => { const sp = $('splash'); const end = () => sp.remove();
   sp.addEventListener('pointerdown', end); setTimeout(end, 2500); })();
