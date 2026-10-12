@@ -363,7 +363,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
     </div>
     <div class="card">
       <div class="note" id="gpsInfo"></div>
-      <div class="note" id="verNote">INTER ZERO Web版 2.3.2</div>
+      <div class="note" id="verNote">INTER ZERO Web版 2.3.3</div>
       <div class="note">音声：VOICEVOX:四国めたん</div>
     </div>
   </section>
@@ -611,7 +611,12 @@ const A = {
   // 00秒を過ぎて2秒以内に押した時は「今スタートした」とみなしてその分に
   ssGo(){
     const n = now(), m0 = minFloor(n);
-    if (!S.ssTent && S.ssStart != null && S.ssStart > n && S.ssStart - n < 10000) return toast('スタート直前のため変更しません（ずらす時は±1分）');
+    // SS MODE をもう一度押したら STANDBY に戻す（スタート時刻は予定として残す。押し間違いは5秒間「元に戻す」）
+    if (!S.ssTent && S.ssStart != null && S.ssFinish == null && S.ssStart > n) {
+      S.ssTent = true; lastSsCue = Infinity; save(); beep(600, 120); vib(60);
+      showUndo(`${S.ssLabel} STANDBYに戻しました`, () => { S.ssTent = false; lastSsCue = Infinity; });
+      return;
+    }
     const st = n - m0 < 2000 ? m0 : m0 + 60000;
     const snap = { ssStart:S.ssStart, ssTent:S.ssTent, secStart:S.secStart };
     if (S.ssStart == null || S.ssFinish != null) Object.assign(S, { ssFinish:null }, ssFresh());
@@ -851,7 +856,7 @@ function render(n){
   $('total').style.setProperty('--ch', Math.max(ts.length, 5));
   setText('speed', String(Math.round(R.speed)));
   setText('interLab', ssCtl ? (ssPend ? `${S.ssLabel} スタート：1分前を切ったらここをタップ → 次の00秒`
-      : `${S.ssLabel} スタート ${hms(S.ssStart)}（押し直すと次の00秒）`) : tcBig ? `${S.tcLabel} 目標 ${hm(t)}　${tlab}（タップで距離に戻す）`
+      : `${S.ssLabel} スタート ${hms(S.ssStart)}（もう一度押すとSTANDBYに戻る）`) : tcBig ? `${S.tcLabel} 目標 ${hm(t)}　${tlab}（タップで距離に戻す）`
     : (ssRun ? `${S.ssLabel} ` : '') + (S.interDown ? 'INTER ▼ 残り km' : 'INTER km'));
   $('badges').innerHTML = (S.frozen ? '<span class="badge">FREEZE</span>' : '') + (S.calibActive ? ' <span class="badge c">校正中</span>' : '');
   setText('stepL1', S.step + 'm'); setText('stepL2', S.step + 'm');
@@ -1345,7 +1350,7 @@ document.addEventListener('pointerup', () => {
   if (!$('start').classList.contains('off') || !orientWrong()) return;
   if (NATIVE) lockOrient(); else if (matchMedia('(pointer:coarse)').matches) goFull(); else lockOrient();
 }, true);
-if (NATIVE) { try { $('verNote').textContent = 'INTER ZERO アプリ版 ' + NATIVE.version() + '（画面 Web版 2.3.2）'; } catch (e) {} }
+if (NATIVE) { try { $('verNote').textContent = 'INTER ZERO アプリ版 ' + NATIVE.version() + '（画面 Web版 2.3.3）'; } catch (e) {} }
 // 起動ロゴ：タップで飛ばせる・終わったら消す
 (() => { const sp = $('splash'); const end = () => sp.remove();
   sp.addEventListener('pointerdown', end); setTimeout(end, 2500); })();
