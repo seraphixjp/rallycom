@@ -49,6 +49,10 @@ button:active{background:#333}
 #view-drive.sswait #interP:active{background:#2a2a2a}
 #view-drive.sswait #spdP{display:none}
 #view-drive.sswait #interP .fit{justify-content:center}
+/* STANDBY の下の案内：気づくように点滅 */
+#sbHint{display:none;text-align:center;font-size:clamp(18px,6vmin,30px);font-weight:800;color:var(--amber);padding:2px 0 6px;animation:sbBlink 1s steps(1) infinite}
+#view-drive.sswait:not(.armed) #sbHint{display:block}
+@keyframes sbBlink{50%{opacity:0}}
 #ciMinus,#ciPlus{flex:.8;height:64px;font-size:17px;font-weight:800;line-height:1.1}
 #ciMinus small,#ciPlus small{display:block;font-size:11px;font-weight:400;color:var(--dim)}
 @media (orientation:landscape){#ciBtn,#ciMinus,#ciPlus{height:46px}#ciBtn{font-size:17px;flex-direction:row;gap:10px}#ciBtn small{margin:0}#ciMinus small,#ciPlus small{display:none}}
@@ -224,6 +228,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
         <div class="panel" id="interP">
           <div class="lab"><span id="interLab">INTER km</span><span class="sp"></span><span id="badges"></span></div>
           <div class="fit"><span id="inter" class="num">0.00</span></div>
+          <div id="sbHint">スタート1分前を切ったらタップ</div>
         </div>
         <div id="rcol">
           <div class="panel" id="tcP">
@@ -363,7 +368,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
     </div>
     <div class="card">
       <div class="note" id="gpsInfo"></div>
-      <div class="note" id="verNote">INTER ZERO Web版 2.3.3</div>
+      <div class="note" id="verNote">INTER ZERO Web版 2.3.4</div>
       <div class="note">音声：VOICEVOX:四国めたん</div>
     </div>
   </section>
@@ -855,7 +860,7 @@ function render(n){
   $('inter').style.setProperty('--ch', ssCtl ? 8.5 : Math.max(is.length, tcBig ? 4 : 5));
   $('total').style.setProperty('--ch', Math.max(ts.length, 5));
   setText('speed', String(Math.round(R.speed)));
-  setText('interLab', ssCtl ? (ssPend ? `${S.ssLabel} スタート：1分前を切ったらここをタップ → 次の00秒`
+  setText('interLab', ssCtl ? (ssPend ? `${S.ssLabel} 予定 ${hm(S.ssStart)}（タップで次の00秒にスタート）`
       : `${S.ssLabel} スタート ${hms(S.ssStart)}（もう一度押すとSTANDBYに戻る）`) : tcBig ? `${S.tcLabel} 目標 ${hm(t)}　${tlab}（タップで距離に戻す）`
     : (ssRun ? `${S.ssLabel} ` : '') + (S.interDown ? 'INTER ▼ 残り km' : 'INTER km'));
   $('badges').innerHTML = (S.frozen ? '<span class="badge">FREEZE</span>' : '') + (S.calibActive ? ' <span class="badge c">校正中</span>' : '');
@@ -1350,7 +1355,7 @@ document.addEventListener('pointerup', () => {
   if (!$('start').classList.contains('off') || !orientWrong()) return;
   if (NATIVE) lockOrient(); else if (matchMedia('(pointer:coarse)').matches) goFull(); else lockOrient();
 }, true);
-if (NATIVE) { try { $('verNote').textContent = 'INTER ZERO アプリ版 ' + NATIVE.version() + '（画面 Web版 2.3.3）'; } catch (e) {} }
+if (NATIVE) { try { $('verNote').textContent = 'INTER ZERO アプリ版 ' + NATIVE.version() + '（画面 Web版 2.3.4）'; } catch (e) {} }
 // 起動ロゴ：タップで飛ばせる・終わったら消す
 (() => { const sp = $('splash'); const end = () => sp.remove();
   sp.addEventListener('pointerdown', end); setTimeout(end, 2500); })();
