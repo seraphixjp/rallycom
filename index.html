@@ -376,7 +376,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
     </div>
     <div class="card">
       <div class="note" id="gpsInfo"></div>
-      <div class="note" id="verNote">INTER ZERO Web版 2.4.2</div>
+      <div class="note" id="verNote">INTER ZERO Web版 2.4.3</div>
       <div class="note">音声：VOICEVOX:四国めたん</div>
     </div>
   </section>
@@ -760,7 +760,7 @@ function tcStatus(n, t){
 }
 // 大きい枠用：[数字, ラベル, 色]。数字は桁だけ（枠いっぱいに出すため）
 function tcBigText(n, t){
-  if (n < t - 60000) return [mmss(t - n), (curRow() || {}).early ? 'まで（早着OK）' : 'まで', 'var(--fg)'];
+  if (n < t - 60000) return [mmss(t - n), (curRow() || {}).early ? 'まで（早着OK）' : 'まで', 'var(--amber)'];
   if (n < t) return [mmss(t - n), 'まで ゾーン可', 'var(--ok)'];
   if (n < t + 60000) return ['0:' + p2(Math.floor((t + 60000 - n) / 1000)), '今なら定刻 残り', 'var(--ok)'];
   return ['+' + mmss(t - n).replace('+', ''), `遅着 ${Math.floor((n - t) / 60000)}分`, 'var(--bad)'];
@@ -822,7 +822,7 @@ function render(n){
   if (tcShow) {
     const sv = tcBig ? km(interShown()) : tv;
     setText('tcLab', tcBig ? 'INTER km' : `${S.tcLabel} ${kd !== 'tc' ? KIND[kd] : ''}${tlab}`); setText('tcV', sv);
-    $('tcV').style.color = tcBig ? 'var(--amber)' : tc;
+    $('tcV').style.color = tcBig ? 'var(--fg)' : tc;   // TC目標がある間：TCまでは黄色、INTERは白
     $('tcV').style.setProperty('--ch', Math.max(sv.length, tcBig ? 5 : 4));
   }
 
@@ -876,8 +876,9 @@ function render(n){
   const iv = interShown();
   // SSのスタート待ちはINTERの枠がスタートボタン（スタート前にINTERは要らない）
   const is = ssCtl ? (ssPend ? 'STANDBY' : 'SS MODE') : tcBig ? tv : km(iv), ts = km(totalShown());
-  setText('inter', is); $('inter').classList.toggle('neg', !tcBig && !ssCtl && S.interDown && iv < 0);
-  $('inter').style.color = ssCtl ? (ssPend ? 'var(--amber)' : 'var(--ok)') : tcBig ? tc : '';
+  const ineg = !tcBig && !ssCtl && S.interDown && iv < 0;
+  setText('inter', is); $('inter').classList.toggle('neg', ineg);
+  $('inter').style.color = ssCtl ? (ssPend ? 'var(--amber)' : 'var(--ok)') : tcBig ? tc : tcShow && !ineg && !ssRun ? 'var(--fg)' : '';
   setText('total', ts);
   // 桁数に合わせて文字を最大化（12.34なら5桁ぶん、123.45になったら6桁ぶん）
   $('inter').style.setProperty('--ch', ssCtl ? 8.5 : Math.max(is.length, tcBig ? 4 : 5));
@@ -1389,7 +1390,7 @@ document.addEventListener('pointerup', () => {
   if (!$('start').classList.contains('off') || !orientWrong()) return;
   if (NATIVE) lockOrient(); else if (matchMedia('(pointer:coarse)').matches) goFull(); else lockOrient();
 }, true);
-if (NATIVE) { try { $('verNote').textContent = 'INTER ZERO アプリ版 ' + NATIVE.version() + '（画面 Web版 2.4.2）'; } catch (e) {} }
+if (NATIVE) { try { $('verNote').textContent = 'INTER ZERO アプリ版 ' + NATIVE.version() + '（画面 Web版 2.4.3）'; } catch (e) {} }
 // 起動ロゴ：タップで飛ばせる・終わったら消す
 (() => { const sp = $('splash'); const end = () => sp.remove();
   sp.addEventListener('pointerdown', end); setTimeout(end, 2500); })();
