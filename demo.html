@@ -184,7 +184,7 @@ async function run(){
   const id = ++runId;
   try {
     setup();
-    cap(1, '走行画面', '大きな数字が<b>INTER（区間距離）</b>、右が<b>TOTAL</b>と<b>速度</b>。GPSのドップラー速度を積分して距離を出すので、カーブで距離が縮まず、<b>停車中に距離が増えることもありません</b>。文字は画面いっぱいに自動で大きくなります。');
+    cap(1, '走行画面', '大きな数字が<b>INTER（区間距離）</b>、右が<b>次のTCまでの時間</b>・<b>TOTAL</b>・<b>速度</b>。GPSのドップラー速度を積分して距離を出すので、カーブで距離が縮まず、<b>停車中に距離が増えることもありません</b>。文字は画面いっぱいに自動で大きくなります。');
     ring('#interP'); await wait(4500); ring('#rcol'); await wait(4500);
 
     cap(2, '距離の補正（＋ −）', 'コマ図の距離とずれたら、左の縦長ボタンで合わせます。1回<b>10m</b>（50m・100mに変更可）。ホルダーに付けたままでも押しやすい大きさです。Bluetoothのリモコンでも操作できます。');
@@ -195,23 +195,24 @@ async function run(){
     cap(3, 'INTER 0', '右の縦長ボタンを<b>1タップ</b>でINTERを0に。押し間違えても<b>5秒以内なら「元に戻す」</b>で、その間に走った距離ごと戻せます。');
     ring('#rstInter'); await wait(1800); await tap('#rstInter'); ring('#undo'); await wait(4500);
 
-    cap(4, 'TCの目標時刻', '目標時刻は<b>区間表</b>から自動で設定。上の帯に残り時間、目標の<b>1分前から緑</b>に変わり、音声で「ゾーンに入れます」とお知らせします。');
-    ring('#strip'); jumpTo(at(9, 27, 56)); car.target = 6;
-    await untilV(at(9, 28, 5)); car.target = 0; await wait(2500);
+    cap(4, 'TCの目標時刻', '目標時刻は<b>区間表</b>から自動で設定。<b>次のTCまでの時間</b>を右上に大きく出し、目標の<b>1分前から緑</b>に。止まって5秒たつと<b>画面いっぱい</b>に切り替わるので、TCの調整で<b>車の外からも見えます</b>。');
+    ring('#tcP'); jumpTo(at(9, 27, 50)); car.target = 6;
+    await untilV(at(9, 28, 0)); car.target = 0;
+    await until(() => W.document.getElementById('view-drive').classList.contains('tcbig')); ring('#interP'); await wait(4500);
     cap(4, 'TCの目標時刻', '目標時刻ちょうどに<b>音声とチェックインボタンの点滅</b>でお知らせ。時計はアプリ版ではGPS時刻に自動で合わせます。');
     jumpTo(at(9, 28, 57)); ring('#ciBtn'); await untilV(at(9, 29, 4)); await wait(1200);
 
-    cap(5, '1タップでチェックイン', '走行画面の下のボタンを<b>1タップ</b>。定刻・遅着・早着とペナルティは<b>JAFの規定どおり</b>に判定。次がSSなら<b>3分後のスタート時刻</b>と、区間表の<b>SS距離</b>が自動で入ります。');
+    cap(5, '1タップでチェックイン', '走行画面の下のボタンを<b>1タップ</b>。定刻・遅着・早着とペナルティは<b>JAFの規定どおり</b>に判定。次がSSなら区間表の<b>SS距離</b>が入り、<b>SSのスタート待ち</b>になります。');
     D.S.ssRecords[0].sp = [car.lat, car.lon];   // 前回の「赤城」は同じ場所からスタートした
     await tap('#ciBtn'); ring('#ssBox'); await wait(5500);
 
-    cap(6, 'SSのカウントダウン', 'スタート<b>30・15・10秒前は音声</b>、<b>5秒前から毎秒ビープ</b>。スタート地点の位置から、前に走ったコース（ここでは<b>「赤城」</b>）だと自動で判定します。');
-    jumpTo(at(9, 31, 28)); await untilV(at(9, 31, 33)); jumpTo(at(9, 31, 44, 300)); await untilV(at(9, 31, 59, 400));
+    cap(6, 'SSスタート', 'スタート<b>1分前を切ったら「SSスタート」を1タップ</b>→<b>次の00秒</b>がスタート。TWZなどでスタートが遅れても合わせられます。<b>30・15・10秒前は音声</b>、<b>5秒前から毎秒ビープ</b>。');
+    jumpTo(at(9, 31, 15)); ring('#ssGo'); await untilV(at(9, 31, 19)); await tap('#ssGo'); ring('#ssBox'); await untilV(at(9, 31, 33)); jumpTo(at(9, 31, 44, 300)); await untilV(at(9, 31, 59, 400));
 
-    cap(7, 'SS走行中', 'INTERの枠が<b>SSタイム</b>に切り替わります。右上は<b>前回同じコースを走った時との差</b>を同じ地点どうしでリアルタイム表示（速い＝<b>緑</b>・遅い＝赤）。右の枠はSSの距離と残り。');
+    cap(7, 'SS走行中', 'SS中は<b>距離だけ</b>。INTERの枠が<b>SSの距離</b>、右の枠が<b>残り距離</b>（ロストした時・パンクで交換するか決める時に）。<b>500mごとにビープ</b>が鳴ります。');
     await untilV(at(9, 32)); car.ssD0 = car.d; car.mode = 'ss'; ring('#interP');
     await wait(2500); speed(3); await until(() => D.S.ssStartTotal != null && D.totalM() - D.S.ssStartTotal > 250);
-    ring('#ssDelta'); await wait(5000); ring('#ssBox');
+    ring('#ssBox'); await wait(5000); ring('#interP');
     await until(() => D.S.ssFinish != null);
     car.mode = 'cruise'; car.target = 0; speed(1); ring(null);
 
@@ -234,7 +235,7 @@ async function run(){
       <li><b>見やすさ</b>：数字は画面いっぱい・横画面標準・必要な情報だけ</li>
       <li><b>押し間違いに強い</b>：大きなボタン、すべての操作を5秒間「元に戻す」</li>
       <li><b>TC・SSの自動化</b>：区間表・JAF規定の判定・SSの自動スタート/終了</li>
-      <li><b>前回比</b>：同じコースをリアルタイムで比較</li>
+      <li><b>距離のビープ</b>：500mごと。レッキの距離メモ・ロストからの復帰に</li>
       <li><b>アプリ版</b>：画面を消しても計測を継続、GPS時刻、オフラインで動作</li></ul>
       <p style="margin:10px 0 0;color:var(--dim);font-size:14px">「自分で触る」で画面を操作できます。</p>`);
     $('barIn').style.width = '100%';

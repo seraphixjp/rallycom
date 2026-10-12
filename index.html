@@ -41,9 +41,16 @@ button:active{background:#333}
 /* 定刻でチェックインできる1分間はゆっくり点滅 */
 #ciBtn.blink{border:2px solid var(--ok);animation:ciBlink 1.6s ease-in-out infinite}
 @keyframes ciBlink{50%{background:#0b4d27}}
+/* SSスタート（ARM方式：1分前を切ったら押す→次の00秒でスタート） */
+#ssGo{flex:2;height:64px;font-size:20px;font-weight:800;color:var(--ok);line-height:1.1;display:none;flex-direction:column;align-items:center;justify-content:center}
+#ssGo small{font-size:12px;font-weight:400;margin-top:3px;color:var(--dim)}
+#ssGo.armed{border:2px solid var(--ok)}
+#ssGo.pend{color:var(--amber);border:2px solid var(--amber)}
+#ctrl.ss #ssGo{display:flex}
+#ctrl.ss #ciBtn{display:none}
 #ciMinus,#ciPlus{flex:.8;height:64px;font-size:17px;font-weight:800;line-height:1.1}
 #ciMinus small,#ciPlus small{display:block;font-size:11px;font-weight:400;color:var(--dim)}
-@media (orientation:landscape){#ciBtn,#ciMinus,#ciPlus{height:46px}#ciBtn{font-size:17px;flex-direction:row;gap:10px}#ciBtn small{margin:0}#ciMinus small,#ciPlus small{display:none}}
+@media (orientation:landscape){#ciBtn,#ssGo,#ciMinus,#ciPlus{height:46px}#ciBtn,#ssGo{font-size:17px;flex-direction:row;gap:10px}#ciBtn small,#ssGo small{margin:0}#ciMinus small,#ciPlus small{display:none}}
 #center{display:contents}
 #top{grid-area:top;display:flex;flex-direction:column;gap:6px}
 #nums{grid-area:nums;display:flex;flex-direction:column;gap:6px;min-height:0}
@@ -60,7 +67,8 @@ button:active{background:#333}
   #center{display:flex;flex-direction:column;gap:4px;grid-area:center;min-height:0;min-width:0}
   #top{flex-direction:row;align-items:center}
   #nums{flex:1;flex-direction:row}
-  #nums > #interP{flex:2.3 1 0}#nums > #rcol{flex:1.1 1 0}
+  #nums > #interP{flex:2.3 1 0}#nums > #rcol{flex:1.3 1 0}
+  #view-drive.ssrun #nums > #rcol{flex:1.7 1 0}
   .step{height:auto}
   #rstInter{font-size:28px}
 }
@@ -96,13 +104,16 @@ button:active{background:#333}
 .fit{flex:1;min-height:0;container-type:size;display:flex;align-items:center;justify-content:flex-end;overflow:hidden}
 .fit span{white-space:nowrap;line-height:1;font-size:14vmin;font-size:min(88cqh,calc(100cqw / (var(--ch) * .6)))}
 #inter{color:var(--amber);--ch:6}
-#ssDelta{font-size:30px;font-weight:800;font-family:var(--num);font-variant-numeric:tabular-nums;line-height:1.1}
-#ssDelta small{font-size:14px;font-weight:400;color:var(--dim);margin-right:6px}
 #inter.neg{color:var(--bad)}
 #total{--ch:6}#speed{--ch:3}
 /* 右の列：TOTAL（SS中はSS枠）と速度を縦に2枠 */
 #rcol{display:flex;flex-direction:column;gap:6px;min-width:0;min-height:0}
-#totP,#spdP{flex:1 1 0}
+#totP{flex:1 1 0}#spdP{flex:.8 1 0}
+/* 次のTCまでの時間（チラ見・車外からも見えるように大きく） */
+#tcP{flex:1.6 1 0;display:none;cursor:pointer}
+#tcP.on{display:flex}
+#tcV{--ch:4}
+#view-drive.ssrun #ssBox{flex:1.6 1 0}
 @media (orientation:portrait){#rcol{flex:0 0 112px;flex-direction:row}}
 #clockRow{display:flex;align-items:center;gap:8px}
 #clock{color:var(--cyan);font-size:44px}
@@ -207,10 +218,14 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
       </div>
       <div id="nums">
         <div class="panel" id="interP">
-          <div class="lab"><span id="interLab">INTER km</span><span class="sp"></span><span id="ssDelta"></span><span id="badges"></span></div>
+          <div class="lab"><span id="interLab">INTER km</span><span class="sp"></span><span id="badges"></span></div>
           <div class="fit"><span id="inter" class="num">0.00</span></div>
         </div>
         <div id="rcol">
+          <div class="panel" id="tcP">
+            <div class="lab" id="tcLab"></div>
+            <div class="fit"><span id="tcV" class="num"></span></div>
+          </div>
           <div class="panel" id="ssBox">
             <div class="lab" id="ssBoxLab"></div>
             <div class="fit"><span id="ssBoxV" class="num"></span></div>
@@ -227,8 +242,9 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
       </div>
       <div id="ctrl">
         <button id="ciBtn"></button>
-        <button id="ciMinus">−1分<small>チェックイン</small></button>
-        <button id="ciPlus">＋1分<small>チェックイン</small></button>
+        <button id="ssGo"></button>
+        <button id="ciMinus">−1分<small id="ciMinusL">チェックイン</small></button>
+        <button id="ciPlus">＋1分<small id="ciPlusL">チェックイン</small></button>
       </div>
     </div>
     <button id="rstInter">INTER<br>0</button>
@@ -286,6 +302,8 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
         <span class="grow note" id="ssDistV"></span>
       </div>
       <div class="row"><span class="grow" style="font-size:14px">スタートでINTERを0にする</span><button class="sw" id="swSsReset"></button></div>
+      <div class="row"><span class="grow" style="font-size:14px">スタート時刻はボタンで決める（スタート1分前を切ったら走行画面の「SSスタート」→次の00秒でスタート）</span><button class="sw" id="swSsBtn"></button></div>
+      <div class="note">オフの時は、チェックインの時刻＋間隔（3分）でそのままスタートします。TWZなどでスタートが遅れることが多いので、オンがおすすめです。</div>
       <div class="note">30・15・10秒前は音声、5秒前から毎秒ビープでお知らせします。SS距離を入れておくと、その距離を走った時点で自動で終了し、目安タイムを記録します（入れていない時は、1分以上走ってから8秒止まったら終了）。正確なタイムはストップで言われたものを入力してください。</div>
     </div>
   </section>
@@ -340,6 +358,11 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
       <div class="note" id="screenNote">画面は自動で消えないようにしています。画面を消したり他のアプリに切り替えると、その間は計測が止まります（戻ったら直線距離で補います）。競技ではアプリ版をおすすめします。</div>
     </div>
     <div class="card">
+      <div class="row"><span class="grow" style="font-size:14px">距離のビープ（INTERの区切りごと）</span><button class="sw" id="swDistBeep"></button></div>
+      <div class="row" id="beepSel"><button class="b grow" data-v="100">100m</button><button class="b grow" data-v="500">500m</button><button class="b grow" data-v="1000">1km</button></div>
+      <div class="note">レッキの距離メモや、ロストした時の復帰に。1km（区切りが1kmの時は5km）ごとは2回鳴ります。</div>
+    </div>
+    <div class="card">
       <div class="row"><span class="grow" style="font-size:14px">音声案内</span><button class="sw" id="swVoice"></button></div>
       <div class="note">物理ボタン（Bluetoothのプレゼン用リモコン・キーボード）<br>
         ・次へ（→ / PageDown）・↑ … 距離＋<br>
@@ -348,7 +371,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
     </div>
     <div class="card">
       <div class="note" id="gpsInfo"></div>
-      <div class="note" id="verNote">INTER ZERO Web版 0.6.8</div>
+      <div class="note" id="verNote">INTER ZERO Web版 2.0.0</div>
       <div class="note">音声：VOICEVOX:四国めたん</div>
     </div>
   </section>
@@ -409,7 +432,10 @@ const DEF = {
   planIdx:null,   // 区間表で次に向かうTCの番号（使っていない時はnull）
   ssCourse:'',    // 次のSSのコース名（同じコースの前回タイムと比べる）
   ssStartPos:null, // SSスタート地点 [緯度, 経度]。同じ地点から始まるSS＝同じコース
-  ssTrace:[],     // 走行中のSSで100mごとの通過タイム（0.1秒単位）。記録に残して次回の比較に使う
+  ssTrace:[],     // 走行中のSSで100mごとの通過タイム（0.1秒単位）。記録に残す（走行中の前回比表示は2.0で外した）
+  ssTent:false,   // SSスタート時刻が予定のまま（ボタンで確定するまでカウントダウン・計測しない）
+  ssBtnMode:true, // SSスタートはボタンで確定する（ARM方式）。falseならチェックイン＋間隔で自動
+  distBeep:true, beepStep:500, // INTERが区切りを越えるたびにビープ
 };
 let S = JSON.parse(JSON.stringify(DEF));   // DEFの配列を共有しないようにコピー
 if (!DEMO) try { Object.assign(S, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
@@ -485,7 +511,7 @@ function onPos(lat, lon, acc, speed, t){
   } else R.prevSpeed = v ?? 0;
   // この区間（前の測位〜今の測位）をアプリの時計に直す
   const off = (R.gpsOffset || 0) + S.manualOffset, tf = t + off, tp = p ? p.t + off : tf, dM = add * S.factor;
-  const ssLive = S.ssStart != null && S.ssFinish == null && tf - S.ssStart < 3600e3;
+  const ssLive = S.ssStart != null && S.ssFinish == null && !S.ssTent && tf - S.ssStart < 3600e3;
   if (ssLive && S.ssStartTotal == null && tf >= S.ssStart) {
     // スタート時刻をこの区間のどこで迎えたかで、スタート時のTOTALを割り出す
     const fr = tf > tp ? Math.min(1, Math.max(0, (S.ssStart - tp) / (tf - tp))) : 1;
@@ -495,11 +521,22 @@ function onPos(lat, lon, acc, speed, t){
   R.lastFix = performance.now();
   R.speed = R.prevSpeed * 3.6;
   R.maxSpeed = Math.max(R.maxSpeed, R.speed);
+  const i0 = interM();
   S.totalRaw += add; S.interRaw += add;
+  distBeep(i0, interM());
   if (ssLive && S.ssStartTotal != null) ssProgress(tp, tf, dM);
   if (S.calibActive) S.calibRaw += add;
   if (gap) S.gapCount++;
   if (Date.now() - lastSave > 2000) save();
+}
+// 距離のビープ：走ってINTERが区切り（500m等）を越えたら鳴らす。1km（区切り1kmなら5km）ごとは2回
+// ±ボタンで越えた時は鳴らさない（ここは測位で進んだ時だけ呼ぶ）
+function distBeep(a, b){
+  const st = S.beepStep; if (!S.distBeep || !(st > 0) || b <= a || b < st) return;
+  const k = Math.floor(b / st); if (k <= Math.floor(a / st)) return;
+  const big = st >= 1000 ? 5000 : 1000;
+  beep(1500, 90);
+  if ((k * st) % big === 0) setTimeout(() => beep(1500, 90), 160);
 }
 // SSスタート：スタート時のTOTAL・通過タイム・スタート地点を決める（1回だけ）
 function ssBegin(total, pos){
@@ -556,7 +593,7 @@ const A = {
   setTotalTo(m){ S.totalAdj = m - S.totalRaw * S.factor; save(); },
   down(m){ if (m == null) S.interDown = false; else Object.assign(S, { interDown:true, interTarget:m, interRaw:0, interAdj:0, frozen:false }); save(); },
   checkIn(){
-    const snap = JSON.parse(JSON.stringify({ tcRecords:S.tcRecords, tcLabel:S.tcLabel, ssStart:S.ssStart, ssFinish:S.ssFinish, secStart:S.secStart, secDur:S.secDur, nextIsSs:S.nextIsSs, planIdx:S.planIdx, ssDist:S.ssDist, ssStartTotal:S.ssStartTotal, ssTrace:S.ssTrace, ssStartPos:S.ssStartPos }));
+    const snap = JSON.parse(JSON.stringify({ tcRecords:S.tcRecords, tcLabel:S.tcLabel, ssStart:S.ssStart, ssFinish:S.ssFinish, ssTent:S.ssTent, secStart:S.secStart, secDur:S.secDur, nextIsSs:S.nextIsSs, planIdx:S.planIdx, ssDist:S.ssDist, ssStartTotal:S.ssStartTotal, ssTrace:S.ssTrace, ssStartPos:S.ssStartPos }));
     const row = S.planIdx != null ? S.plan[S.planIdx] : null;
     const actual = ciActual();
     const target = targetMs() ?? actual;
@@ -564,7 +601,8 @@ const A = {
     S.tcLabel = nextLabel(S.tcLabel);
     if (S.nextIsSs) {
       const st = actual + S.ssGap * 60000;
-      Object.assign(S, { ssStart:st, ssFinish:null, secStart:st, secDur:0, nextIsSs:false }, ssFresh());
+      // ボタン方式では予定のまま（スタート1分前に「SSスタート」で確定）
+      Object.assign(S, { ssStart:st, ssFinish:null, ssTent:S.ssBtnMode, secStart:st, secDur:0, nextIsSs:false }, ssFresh());
       if (row && row.dist > 0) S.ssDist = row.dist;
       lastSsCue = Infinity;
     } else Object.assign(S, { secStart:actual, secDur:0 });
@@ -573,6 +611,18 @@ const A = {
     ciDelta = 0; save(); vib(60);
     showUndo(`${S.tcRecords.at(-1).l} ${hm(actual)} でチェックイン`, () => { Object.assign(S, snap); lastSsCue = Infinity; ciDelta = actual - minFloor(now()); });
   },
+  // SSスタート（ARM方式）：スタート1分前を切ったら押す→次の00秒をスタート時刻にする
+  // 00秒を過ぎて2秒以内に押した時は「今スタートした」とみなしてその分に
+  ssGo(){
+    const n = now(), m0 = minFloor(n);
+    const st = n - m0 < 2000 ? m0 : m0 + 60000;
+    const snap = { ssStart:S.ssStart, ssTent:S.ssTent, secStart:S.secStart };
+    if (S.ssStart == null || S.ssFinish != null) Object.assign(S, { ssFinish:null }, ssFresh());
+    Object.assign(S, { ssStart:st, ssTent:false, secStart:st });
+    lastSsCue = Infinity; save(); beep(1000, 80); vib(60);
+    showUndo(`${S.ssLabel} スタート ${hms(st)}`, () => { Object.assign(S, snap); lastSsCue = Infinity; });
+  },
+  ssShift(ms){ if (S.ssStart == null) return; S.ssStart += ms; S.secStart = S.ssStart; lastSsCue = Infinity; save(); },
   // SS終了（ストップで止まったら自動）。タイムは主催者に言われたものを後で入力
   ssFinish(at, manual){
     if (S.ssStart == null || S.ssFinish != null) return; const n = at ?? now(); if (n <= S.ssStart) return;
@@ -597,7 +647,7 @@ const A = {
   },
   ssSetTime(i, ms){ const r = S.ssRecords[i]; if (!r) return; r.t = ms; if (S.ssAwait === i) S.ssAwait = null; save(); },
   resetRally(){
-    const keep = { factor:S.factor, step:S.step, adjTotal:S.adjTotal, voice:S.voice, orient:S.orient };
+    const keep = { factor:S.factor, step:S.step, adjTotal:S.adjTotal, voice:S.voice, orient:S.orient, ssBtnMode:S.ssBtnMode, distBeep:S.distBeep, beepStep:S.beepStep };
     S = Object.assign(JSON.parse(JSON.stringify(DEF)), keep);
     R.maxSpeed = 0; R.prev = null; R.prevSpeed = 0; lastSsCue = Infinity; stillSince = null; ciDelta = 0;
     save(); hideUndo(); closeSsDlg(); renderRec(); renderPlan(); fillTcInputs(); toast('全部リセットしました');
@@ -642,7 +692,7 @@ let lastSsCue = Infinity, zoneCued = 0, targetCued = 0, gpsLostCued = false, sti
 function tick(){
   const n = now();
   // SSカウントダウン
-  if (S.ssStart != null && S.ssFinish == null) {
+  if (S.ssStart != null && S.ssFinish == null && !S.ssTent) {
     const remain = S.ssStart - n, sec = Math.ceil(remain / 1000);
     if (remain > 0 && [30, 15, 10, 5, 4, 3, 2, 1].includes(sec) && sec < lastSsCue) {
       lastSsCue = sec;
@@ -651,7 +701,7 @@ function tick(){
       lastSsCue = 0; beep(1400, 900); vib(600);
     } else if (remain > 31000) lastSsCue = Infinity;
   }
-  if (S.ssStart != null && S.ssFinish == null && n >= S.ssStart && n - S.ssStart < 3600e3) {
+  if (S.ssStart != null && S.ssFinish == null && !S.ssTent && n >= S.ssStart && n - S.ssStart < 3600e3) {
     // 予備：GPSは生きているのに精度不足などでスタートが決まらない時（ふつうは測位の時刻で決まる）
     if (S.ssStartTotal == null && n - S.ssStart > 5000 && gpsAge() < 3) ssBegin(totalM());
     if (S.ssStartTotal != null && !(S.ssDist > 0) && n - S.ssStart > 60000) {
@@ -668,6 +718,9 @@ function tick(){
     if (n >= t - 60000 && n < t - 55000 && zoneCued !== t) { zoneCued = t; beep(880, 300); say('目標の1分前です。ゾーンにはいれます'); }
     if (n >= t && n < t + 5000 && targetCued !== t) { targetCued = t; beep(1200, 400); vib(300); say('目標時刻です'); }
   }
+  // 停車（TCの調整待ち）：止まって5秒たったら、TCまでの時間を大きく出す
+  if (gpsAge() < 3 && R.speed < 3) R.stopAt = R.stopAt ?? n;
+  else if (R.speed > 8 || gpsAge() >= 3) { R.stopAt = null; R.tcAutoOff = false; }
   // GPSロスト
   if (R.running && R.speed > 10 && gpsAge() > 5) { if (!gpsLostCued) { gpsLostCued = true; beep(300, 400); say('GPSが途切れました'); } }
   else if (gpsAge() < 2) gpsLostCued = false;
@@ -680,6 +733,20 @@ function tcStatus(n, t){
   if (n < t - 60000) return ['あと ' + mmss(t - n), 'var(--fg)'];
   if (n < t) return ['ゾーン可 あと ' + mmss(t - n), 'var(--ok)'];   // 目標1分前からSS色
   if (n < t + 60000) return ['今出せば定刻 残' + Math.floor((t + 60000 - n) / 1000) + '秒', 'var(--ok)'];
+  return ['遅着 ' + Math.floor((n - t) / 60000) + '分', 'var(--bad)'];
+}
+// 大きい枠用：[数字, ラベル, 色]。数字は桁だけ（枠いっぱいに出すため）
+function tcBigText(n, t){
+  if (n < t - 60000) return [mmss(t - n), 'まで', 'var(--fg)'];
+  if (n < t) return [mmss(t - n), 'まで ゾーン可', 'var(--ok)'];
+  if (n < t + 60000) return ['0:' + p2(Math.floor((t + 60000 - n) / 1000)), '今なら定刻 残り', 'var(--ok)'];
+  return ['+' + mmss(t - n).replace('+', ''), `遅着 ${Math.floor((n - t) / 60000)}分`, 'var(--bad)'];
+}
+// 上の帯用の短い状況
+function tcWord(n, t){
+  if (n < t - 60000) return ['', 'var(--fg)'];
+  if (n < t) return ['ゾーン可', 'var(--ok)'];
+  if (n < t + 60000) return ['今なら定刻', 'var(--ok)'];
   return ['遅着 ' + Math.floor((n - t) / 60000) + '分', 'var(--bad)'];
 }
 function setText(id, v){ const e = $(id); if (e.textContent !== v) e.textContent = v; }
@@ -702,74 +769,100 @@ function render(n){
   $('gpsDot').style.color = gc;
   $('clock').title = R.gpsOffset != null ? 'GPS時刻' : '端末時刻';
 
-  // 状況ストリップ
-  let L = '区間未設定', Rt = 'TC・SSタブで入力', C = 'var(--dim)';
+  // SSの状態：予定（ボタン待ち）／カウントダウン／走行中
   const t = targetMs();
-  if (S.ssStart != null && S.ssFinish == null && n < S.ssStart) { L = `${S.ssLabel} スタート ${hms(S.ssStart)}`; Rt = 'あと ' + mmss(S.ssStart - n); C = S.ssStart - n <= 30000 ? 'var(--warn)' : 'var(--fg)'; }
-  else if (S.ssStart != null && S.ssFinish == null && n - S.ssStart < 3600e3 && t == null) { L = `${S.ssLabel} 走行中`; Rt = stageTime(n - S.ssStart); C = 'var(--ok)'; }
-  else if (t != null) { [Rt, C] = tcStatus(n, t); L = `${S.tcLabel} 目標 ${hm(t)}`; }
+  const ssOpen = S.ssStart != null && S.ssFinish == null;
+  const ssPend = ssOpen && S.ssTent;
+  const ssCount = ssOpen && !S.ssTent && n < S.ssStart && S.ssStart - n <= 600000;
+  const ssRun = ssOpen && !S.ssTent && n >= S.ssStart && n - S.ssStart < 3600e3;
+  const ssNear = ssPend || ssCount || ssRun;
+
+  // 状況ストリップ（次のTCまでの時間は右の大きい枠に出す）
+  let L = '区間未設定', Rt = 'TC・SSタブで入力', C = 'var(--dim)';
+  if (ssPend) { L = `${S.ssLabel} スタート待ち（予定 ${hm(S.ssStart)}）`; Rt = '1分前を切ったら下のボタン'; C = 'var(--amber)'; }
+  else if (ssCount) { L = `${S.ssLabel} スタート ${hms(S.ssStart)}`; Rt = 'あと ' + mmss(S.ssStart - n); C = S.ssStart - n <= 30000 ? 'var(--warn)' : 'var(--fg)'; }
+  else if (ssRun && t == null) { L = `${S.ssLabel} 走行中`; Rt = ''; C = 'var(--ok)'; }
+  else if (t != null) { L = `${S.tcLabel} 目標 ${hm(t)}`; [Rt, C] = tcWord(n, t); }
   else if (S.secStart != null) { L = `${S.tcLabel} 区間スタート ${hm(S.secStart)}`; Rt = '所要時間を入力'; C = 'var(--warn)'; }
   setText('stripL', L); setText('stripR', Rt); $('stripR').style.color = C;
 
-  // SS枠：スタート10分前〜走行中〜タイム入力待ち
+  // 次のTCまでの時間：右の列の一番上に大きく。止まって5秒（TCの調整待ち）、または枠をタップでINTERの枠いっぱいに
+  const tcShow = t != null && !ssNear;
+  const autoBig = tcShow && R.stopAt != null && n - R.stopAt > 5000 && t - n <= 300000 && n < t + 60000 && !R.tcAutoOff;
+  const tcBig = tcShow && (R.tcPin || autoBig);
+  if (!tcShow) R.tcPin = false;
+  const [tv, tlab, tc] = tcShow ? tcBigText(n, t) : ['', '', ''];
+  // 大きくしている間は入れ替え：INTERの枠にTCまでの時間、この枠にINTER（距離は見えなくならない）
+  $('tcP').classList.toggle('on', tcShow);
+  if (tcShow) {
+    const sv = tcBig ? km(interShown()) : tv;
+    setText('tcLab', tcBig ? 'INTER km' : `${S.tcLabel} ${tlab}`); setText('tcV', sv);
+    $('tcV').style.color = tcBig ? 'var(--amber)' : tc;
+    $('tcV').style.setProperty('--ch', Math.max(sv.length, tcBig ? 5 : 4));
+  }
+
+  // SS枠：スタート待ち〜走行中〜タイム入力待ち
   const box = $('ssBox');
   let bl = '', bv = '', bc = 'var(--fg)', bcls = '';
-  // 次のSSのカウントダウン・走行中は、前のSSのタイム入力待ちより優先
-  const ssNear = S.ssStart != null && S.ssFinish == null && S.ssStart - n <= 600000 && n - S.ssStart < 3600e3;
+  // 次のSSのスタート待ち・走行中は、前のSSのタイム入力待ちより優先
   if (!ssNear && S.ssAwait != null && S.ssRecords[S.ssAwait]) {
     bl = `${S.ssRecords[S.ssAwait].l} 終了（タップ）`; bv = 'タイム入力'; bc = 'var(--amber)'; bcls = 'await';
-  } else if (ssNear) {
-    if (n < S.ssStart) { const lc = liveCourse(); bl = `${S.ssLabel} スタートまで` + (S.ssDist > 0 ? `（${km(S.ssDist)} km${lc ? '・' + lc : ''}）` : `（SS距離未設定${lc ? '・' + lc : ''}）`); bv = mmss(S.ssStart - n); bc = S.ssStart - n <= 30000 ? 'var(--warn)' : 'var(--fg)'; }
-    else {
-      // 走行中はタイムをINTERの大きい枠へ、こちらはSSの距離
-      const ran = S.ssStartTotal != null ? totalM() - S.ssStartTotal : 0;
-      bl = `${S.ssLabel} 距離 km` + (S.ssDist > 0 ? `　残り ${km(Math.max(0, S.ssDist - ran))}` : '');
-      bv = km(Math.max(0, ran)); bc = 'var(--ok)'; bcls = 'run';
-    }
+  } else if (ssPend || ssCount) {
+    const lc = liveCourse(), info = (S.ssDist > 0 ? `${km(S.ssDist)} km` : 'SS距離未設定') + (lc ? '・' + lc : '');
+    if (ssPend) { bl = `${S.ssLabel} 予定 ${hm(S.ssStart)}（${info}）`; bv = n < S.ssStart ? mmss(S.ssStart - n) : '--:--'; bc = 'var(--dim)'; }
+    else { bl = `${S.ssLabel} スタートまで（${info}）`; bv = mmss(S.ssStart - n); bc = S.ssStart - n <= 30000 ? 'var(--warn)' : 'var(--fg)'; }
+  } else if (ssRun && S.ssDist > 0) {
+    // 走行中は距離だけ（タイムは見る暇が無い）。こちらは残り距離＝パンク時の判断・ロストの目安
+    const ran = S.ssStartTotal != null ? totalM() - S.ssStartTotal : 0;
+    bl = `${S.ssLabel} 残り km（全長 ${km(S.ssDist)}）`; bv = km(Math.max(0, S.ssDist - ran)); bc = 'var(--ok)'; bcls = 'run';
   }
   box.className = 'panel' + (bl ? ' on ' + bcls : '');
-  // SS枠が出ている間はTOTAL（と速度）を消して、その場所にSS枠を出す
+  // SS枠が出ている間はTOTALを消して、その場所にSS枠を出す
   $('totP').style.display = bl ? 'none' : '';
-  // 下の段（TCチェックイン）はSSのカウントダウン・走行中だけ消す（タイム入力待ちの間に次のTCに着くこともある）
-  $('ctrl').classList.toggle('off', ssNear);
-  if (!ssNear) {
-    const a = ciActual(), tg = targetMs();
-    const d = tg != null ? Math.round((a - tg) / 60000) : null;
+  // 下の段：ふだんはTCチェックイン、SSのスタート待ちは「SSスタート」、走行中は消す（右の「SS終了」だけ）
+  const ssCtl = ssPend || ssCount;
+  $('ctrl').classList.toggle('off', ssRun);
+  $('ctrl').classList.toggle('ss', ssCtl);
+  setText('ciMinusL', ssCtl ? 'スタート' : 'チェックイン'); setText('ciPlusL', ssCtl ? 'スタート' : 'チェックイン');
+  if (ssCtl) {
+    const html = ssPend ? `${S.ssLabel} スタート<small>1分前を切ったら押す→次の00秒</small>`
+      : `スタート ${hms(S.ssStart)}<small>押し直すと次の00秒に</small>`;
+    if ($('ssGo').innerHTML !== html) $('ssGo').innerHTML = html;
+    $('ssGo').className = ssPend ? 'pend' : 'armed';
+  } else if (!ssRun) {
+    const a = ciActual();
+    const d = t != null ? Math.round((a - t) / 60000) : null;
     const sub = d == null ? '目標未設定' : d === 0 ? '定刻' : d > 0 ? `遅着 ${d}分` : `早着 ${-d}分`;
     const html = `${S.tcLabel} チェックイン ${hm(a)}<small>${sub}${ciDelta ? '（補正中）' : ''}</small>`;
     if ($('ciBtn').innerHTML !== html) $('ciBtn').innerHTML = html;
     $('ciBtn').style.color = d == null || d === 0 ? 'var(--ok)' : 'var(--bad)';
-    $('ciBtn').classList.toggle('blink', tg != null && n >= tg && n < tg + 60000);
+    $('ciBtn').classList.toggle('blink', t != null && n >= t && n < t + 60000);
   }
   if (bl) {
     setText('ssBoxLab', bl); setText('ssBoxV', bv); $('ssBoxV').style.color = bc;
     $('ssBoxV').style.setProperty('--ch', bcls === 'await' ? 9 : Math.max(bv.length, 5));
   }
   // SS枠が出ている間、上の帯はTCの目標がある時だけ出す（情報を減らす）
-  $('strip').style.visibility = (bl && t == null) ? 'hidden' : '';
+  $('strip').style.visibility = (bl && t == null && !ssPend) ? 'hidden' : '';
 
-  // 距離
-  const ssRun = S.ssStart != null && S.ssFinish == null && n >= S.ssStart && n - S.ssStart < 3600e3;
+  // 距離（SS走行中もINTER＝SSの距離。タイムは出さない）
   const iv = interShown();
-  const is = ssRun ? stageTime(n - S.ssStart) : km(iv), ts = km(totalShown());
-  setText('inter', is); $('inter').classList.toggle('neg', !ssRun && S.interDown && iv < 0);
+  const is = tcBig ? tv : km(iv), ts = km(totalShown());
+  setText('inter', is); $('inter').classList.toggle('neg', !tcBig && S.interDown && iv < 0);
+  $('inter').style.color = tcBig ? tc : '';
   setText('total', ts);
   // 桁数に合わせて文字を最大化（12.34なら5桁ぶん、123.45になったら6桁ぶん）
-  $('inter').style.setProperty('--ch', Math.max(is.length, ssRun ? 6 : 5));
+  $('inter').style.setProperty('--ch', Math.max(is.length, tcBig ? 4 : 5));
   $('total').style.setProperty('--ch', Math.max(ts.length, 5));
   setText('speed', String(Math.round(R.speed)));
-  setText('interLab', ssRun ? `${S.ssLabel} タイム` : S.interDown ? 'INTER ▼ 残り km' : 'INTER km');
+  setText('interLab', tcBig ? `${S.tcLabel} 目標 ${hm(t)}　${tlab}（タップで距離に戻す）`
+    : (ssRun ? `${S.ssLabel} ` : '') + (S.interDown ? 'INTER ▼ 残り km' : 'INTER km'));
   $('badges').innerHTML = (S.frozen ? '<span class="badge">FREEZE</span>' : '') + (S.calibActive ? ' <span class="badge c">校正中</span>' : '');
   setText('stepL1', S.step + 'm'); setText('stepL2', S.step + 'm');
   $('view-drive').classList.toggle('ssrun', ssRun);
+  $('view-drive').classList.toggle('tcbig', tcBig);
   const rb = ssRun ? 'SS<br>終了' : 'INTER<br>0';
-  // 前回の同じ地点との差（速い＝緑のマイナス、遅い＝赤のプラス）
-  const ld = ssRun ? liveDelta(n) : null;
-  const ldh = ld == null ? '' : `<small>前回比</small>${ld <= 0 ? '−' : '+'}${Math.abs(ld / 1000).toFixed(1)}`;
-  if ($('ssDelta').innerHTML !== ldh) $('ssDelta').innerHTML = ldh;
-  $('ssDelta').style.color = ld != null && ld <= 0 ? 'var(--ok)' : 'var(--bad)';
   if ($('rstInter').innerHTML !== rb) $('rstInter').innerHTML = rb;
-
 
   if (view === 'tc') renderTc(n);
   if (view === 'set') renderSet();
@@ -782,7 +875,7 @@ function renderTc(n){
     const [m, c] = tcStatus(n, t);
     $('tcInfo').innerHTML = `<div class="num big1">目標 ${hm(t)}</div><div class="num big2" style="color:${c}">${m}</div><div class="note">区間スタート ${hm(S.secStart)} ＋ ${S.secDur}分</div>`;
   } else $('tcInfo').innerHTML = '<div class="note">区間スタート時刻と目標所要時間（分）を入れてください。チェックインやSSスタートを記録すると、スタート時刻は自動で入ります</div>';
-  const ns = S.nextIsSs ? `次はSS：ON<small>チェックイン＋${S.ssGap}分でSSスタート</small>` : `次はSS：OFF<small>タップでON（このTCの次がSSのとき）</small>`;
+  const ns = S.nextIsSs ? `次はSS：ON<small>${S.ssBtnMode ? `スタート予定はチェックイン＋${S.ssGap}分（走行画面のボタンで確定）` : `チェックイン＋${S.ssGap}分でSSスタート`}</small>` : `次はSS：OFF<small>タップでON（このTCの次がSSのとき）</small>`;
   if ($('swNextSs').innerHTML !== ns) $('swNextSs').innerHTML = ns;
   $('swNextSs').classList.toggle('on', S.nextIsSs);
   $('gapRow').style.display = S.nextIsSs ? '' : 'none'; setText('gapV', S.ssGap + '分');
@@ -792,7 +885,9 @@ function renderTc(n){
   // SS
   const st = S.ssStart;
   let h = '';
-  if (st != null && S.ssFinish == null) {
+  if (st != null && S.ssFinish == null && S.ssTent) {
+    h = `<div class="num big2" style="color:var(--amber)">予定 ${hm(st)}（未確定）</div><div class="note">スタート1分前を切ったら走行画面の「SSスタート」を押してください。次の00秒がスタートになります。</div>`;
+  } else if (st != null && S.ssFinish == null) {
     h = `<div class="num big2">スタート ${hms(st)}</div>`;
     if (n < st) h += `<div class="num big3" style="color:${st - n <= 30000 ? 'var(--warn)' : 'var(--fg)'}">あと ${mmss(st - n)}</div>`;
     else h += `<div class="num big3" style="color:var(--ok)">${stageTime(n - st)}</div>`;
@@ -802,10 +897,11 @@ function renderTc(n){
                     : `<div style="color:var(--amber);font-size:18px">${r.l} タイム未入力（目安 ${stageTime(r.f - r.s)}）</div>`;
   }
   if ($('ssInfo').innerHTML !== h) $('ssInfo').innerHTML = h;
-  $('ssFin').style.display = (st != null && S.ssFinish == null && n >= st) ? '' : 'none';
+  $('ssFin').style.display = (st != null && S.ssFinish == null && !S.ssTent && n >= st) ? '' : 'none';
   $('ssTimeBtn').style.display = (S.ssAwait ?? lastUntimed()) != null ? '' : 'none';
   setText('ssDistV', S.ssDist > 0 ? `設定中 ${km(S.ssDist)} km` : '未設定（止まったら終了）');
   $('swSsReset').classList.toggle('on', S.ssResetTrips);
+  $('swSsBtn').classList.toggle('on', S.ssBtnMode);
 }
 
 function renderSet(){
@@ -822,6 +918,8 @@ function renderSet(){
   document.querySelectorAll('#stepSel button').forEach(b => b.classList.toggle('sel', +b.dataset.v === S.step));
   $('swAdjTotal').classList.toggle('on', S.adjTotal);
   $('swVoice').classList.toggle('on', S.voice);
+  $('swDistBeep').classList.toggle('on', S.distBeep);
+  document.querySelectorAll('#beepSel button').forEach(b => b.classList.toggle('sel', +b.dataset.v === S.beepStep));
   document.querySelectorAll('#orientSel button').forEach(b => b.classList.toggle('sel', b.dataset.o === S.orient));
   setText('manualV', `手動補正：${S.manualOffset >= 0 ? '+' : ''}${(S.manualOffset / 1000).toFixed(1)}秒`);
   setText('gpsInfo', `欠測（トンネル・画面オフ等）：${S.gapCount}回　最高速 ${Math.round(R.maxSpeed)}km/h`);
@@ -855,23 +953,9 @@ function guessCourse(dist, pos){
   }
   return '';
 }
-// 走行中のSSのコース（入力が無ければSS距離から推定）と、比べる前回の走行（通過タイムがあるもの）
+// 走行中のSSのコース（入力が無ければSS距離から推定）
 // スタート前は今いる場所（スタート待ちの位置）で判定
 const liveCourse = () => S.ssCourse || guessCourse(S.ssDist, S.ssStartPos || curPos());
-function liveRef(){
-  const c = liveCourse(); if (!c) return null;
-  for (let j = S.ssRecords.length - 1; j >= 0; j--) { const q = S.ssRecords[j]; if (q.c === c && q.tr && q.tr.length > 2) return q; }
-  return null;
-}
-// 同じ距離の地点で前回より何秒速いか遅いか（ms、プラス＝遅い）
-function liveDelta(n){
-  if (S.ssStartTotal == null) return null;
-  const ref = liveRef(); if (!ref) return null;
-  const ran = totalM() - S.ssStartTotal; if (ran < 200) return null;
-  const k = ran / 100, i = Math.floor(k); if (i + 1 >= ref.tr.length) return null;
-  const rt = (ref.tr[i] + (ref.tr[i + 1] - ref.tr[i]) * (k - i)) * 100;
-  return (n - S.ssStart) - rt;
-}
 const esc = v => String(v).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 const courses = () => [...new Set(S.ssRecords.map(r => r.c).filter(Boolean))];
 function renderRec(){
@@ -921,8 +1005,13 @@ function hideUndo(){ $('undo').classList.remove('on'); undoFn = null; }
 on('undoBtn', () => A.undo());
 // 走行画面のTCチェックイン：1タップ＋5秒間「元に戻す」
 on('ciBtn', () => { A.checkIn(); flash('ciBtn'); });
-on('ciMinus', () => { ciDelta -= 60000; });
-on('ciPlus', () => { ciDelta += 60000; });
+// ±1分：ふだんはチェックイン時刻、SSのスタート待ちの間はスタート時刻
+on('ciMinus', () => { if ($('ctrl').classList.contains('ss')) A.ssShift(-60000); else ciDelta -= 60000; });
+on('ciPlus', () => { if ($('ctrl').classList.contains('ss')) A.ssShift(60000); else ciDelta += 60000; });
+on('ssGo', () => { A.ssGo(); flash('ssGo'); });
+// 次のTCまでの時間：小さい枠をタップで大きく、大きい方をタップで距離に戻す（動き出すまで自動では大きくしない）
+on('tcP', () => { if ($('view-drive').classList.contains('tcbig')) { R.tcPin = false; R.tcAutoOff = true; } else R.tcPin = true; });
+on('interP', () => { if ($('view-drive').classList.contains('tcbig')) { R.tcPin = false; R.tcAutoOff = true; } });
 $('rstInter').addEventListener('pointerdown', e => {
   e.preventDefault(); flash('rstInter');
   if ($('view-drive').classList.contains('ssrun')) A.ssFinish(null, true); else A.resetInter();
@@ -957,9 +1046,9 @@ on('ssSet', () => {
   const h = parseInt($('ssH').value), m = parseInt($('ssMi').value);
   if (!(h >= 0 && h <= 23 && m >= 0 && m <= 59)) return toast('時刻を確認してください');
   const st = minuteToday(h, m);
-  Object.assign(S, { ssStart:st, ssFinish:null, secStart:st, secDur:S.planIdx != null ? (planDurs()[S.planIdx] || 0) : 0 }, ssFresh()); lastSsCue = Infinity; save(); toast('SSスタートを設定しました');
+  Object.assign(S, { ssStart:st, ssFinish:null, ssTent:false, secStart:st, secDur:S.planIdx != null ? (planDurs()[S.planIdx] || 0) : 0 }, ssFresh()); lastSsCue = Infinity; save(); toast('SSスタートを設定しました');
 });
-on('ssClear', () => { S.ssStart = null; S.ssFinish = null; Object.assign(S, ssFresh()); save(); fillTcInputs(); });
+on('ssClear', () => { S.ssStart = null; S.ssFinish = null; S.ssTent = false; Object.assign(S, ssFresh()); save(); fillTcInputs(); });
 on('ssFin', () => A.ssFinish(null, true));
 on('ssDistSet', () => {
   const v = parseFloat($('ssDistIn').value);
@@ -1010,6 +1099,7 @@ on('ssDlgOk', () => {
   toast(q ? `${dlgCourse} 前回比 ${deltaText(S.ssRecords[i].t - q.t)}` : 'タイムを記録しました');
 });
 on('swSsReset', () => { S.ssResetTrips = !S.ssResetTrips; save(); });
+on('swSsBtn', () => { S.ssBtnMode = !S.ssBtnMode; if (!S.ssBtnMode && S.ssTent) { S.ssTent = false; lastSsCue = Infinity; } save(); });
 
 // 区間表：目標時刻の差から各区間の所要時間を出す（SSの前は「SSまでの間隔」を引く）
 const tmOf = (h, m) => (h >= 0 && h <= 23 && m >= 0 && m <= 59) ? h * 60 + m : null;
@@ -1136,6 +1226,8 @@ on('downEnd', () => A.down(null));
 document.querySelectorAll('[data-clk]').forEach(b => b.addEventListener('click', () => { S.manualOffset += +b.dataset.clk; save(); }));
 on('clk0', () => { S.manualOffset = 0; save(); });
 on('swVoice', () => { S.voice = !S.voice; save(); });
+on('swDistBeep', () => { S.distBeep = !S.distBeep; save(); if (S.distBeep) beep(1500, 90); });
+document.querySelectorAll('#beepSel button').forEach(b => b.addEventListener('click', () => { S.beepStep = +b.dataset.v; save(); }));
 on('fullBtn', goFull);
 document.querySelectorAll('#orientSel button').forEach(b => b.addEventListener('click', () => {
   S.orient = b.dataset.o; save(); goFull();
@@ -1247,7 +1339,7 @@ document.addEventListener('pointerup', () => {
   if (!$('start').classList.contains('off') || !orientWrong()) return;
   if (NATIVE) lockOrient(); else if (matchMedia('(pointer:coarse)').matches) goFull(); else lockOrient();
 }, true);
-if (NATIVE) { try { $('verNote').textContent = 'INTER ZERO アプリ版 ' + NATIVE.version() + '（画面 Web版 0.6.8）'; } catch (e) {} }
+if (NATIVE) { try { $('verNote').textContent = 'INTER ZERO アプリ版 ' + NATIVE.version() + '（画面 Web版 2.0.0）'; } catch (e) {} }
 // 起動ロゴ：タップで飛ばせる・終わったら消す
 (() => { const sp = $('splash'); const end = () => sp.remove();
   sp.addEventListener('pointerdown', end); setTimeout(end, 2500); })();
