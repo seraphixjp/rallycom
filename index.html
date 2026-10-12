@@ -376,7 +376,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
     </div>
     <div class="card">
       <div class="note" id="gpsInfo"></div>
-      <div class="note" id="verNote">INTER ZERO Web版 2.4.0</div>
+      <div class="note" id="verNote">INTER ZERO Web版 2.4.1</div>
       <div class="note">音声：VOICEVOX:四国めたん</div>
     </div>
   </section>
@@ -857,10 +857,12 @@ function render(n){
     const a = ciActual();
     const d = t != null ? Math.round((a - t) / 60000) : null;
     const eok = (curRow() || {}).early && d < 0;
+    const wait = kd !== 'tc' && t != null && n < t - 60000;
     const sub = d == null ? '目標未設定' : d === 0 ? '定刻' : d > 0 ? `遅着 ${d}分` : eok ? '早着OK（ペナなし）' : `早着 ${-d}分`;
-    const html = `${S.tcLabel} チェックイン ${hm(a)}<small>${sub}${ciDelta ? '（補正中）' : ''}</small>`;
+    const html = wait ? `${kd === 'sv' ? 'サービス中' : 'リグループ中'}　OUT ${hm(t)}<small>${S.tcLabel}・1分前からチェックイン</small>`
+      : `${S.tcLabel} チェックイン ${hm(a)}<small>${sub}${ciDelta ? '（補正中）' : ''}</small>`;
     if ($('ciBtn').innerHTML !== html) $('ciBtn').innerHTML = html;
-    $('ciBtn').style.color = d == null || d === 0 || eok ? 'var(--ok)' : 'var(--bad)';
+    $('ciBtn').style.color = wait ? 'var(--cyan)' : d == null || d === 0 || eok ? 'var(--ok)' : 'var(--bad)';
     $('ciBtn').classList.toggle('blink', t != null && n >= t && n < t + 60000);
   }
   if (bl) {
@@ -1384,7 +1386,7 @@ document.addEventListener('pointerup', () => {
   if (!$('start').classList.contains('off') || !orientWrong()) return;
   if (NATIVE) lockOrient(); else if (matchMedia('(pointer:coarse)').matches) goFull(); else lockOrient();
 }, true);
-if (NATIVE) { try { $('verNote').textContent = 'INTER ZERO アプリ版 ' + NATIVE.version() + '（画面 Web版 2.4.0）'; } catch (e) {} }
+if (NATIVE) { try { $('verNote').textContent = 'INTER ZERO アプリ版 ' + NATIVE.version() + '（画面 Web版 2.4.1）'; } catch (e) {} }
 // 起動ロゴ：タップで飛ばせる・終わったら消す
 (() => { const sp = $('splash'); const end = () => sp.remove();
   sp.addEventListener('pointerdown', end); setTimeout(end, 2500); })();
