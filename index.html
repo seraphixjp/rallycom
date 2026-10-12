@@ -50,7 +50,12 @@ button:active{background:#333}
 #view-drive.sswait.armed #interP{border-color:var(--ok)}
 #view-drive.sswait #interP:active{background:#2a2a2a}
 #view-drive.sswait #spdP{display:none}
-#view-drive.sswait #interP .fit{justify-content:center}
+/* STANDBY／SS MODE は枠のちょうど真ん中に：上の見出しと下の案内は重ねて置き、文字の上下に同じ余白 */
+#view-drive.sswait #interP{position:relative}
+#view-drive.sswait #interP > .lab{position:absolute;top:4px;left:10px;right:10px}
+#view-drive.sswait #interP .fit{justify-content:center;padding:clamp(30px,10vmin,48px) 0}
+#view-drive.sswait #interP .fit span{text-align:center}
+#view-drive.sswait #sbHint{position:absolute;left:0;right:0;bottom:4px}
 /* STANDBY の下の案内：気づくように点滅 */
 #sbHint{display:none;text-align:center;font-size:clamp(18px,6vmin,30px);font-weight:800;color:var(--amber);padding:2px 0 6px;animation:sbBlink 1s steps(1) infinite}
 #view-drive.sswait:not(.armed) #sbHint{display:block}
@@ -376,7 +381,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
     </div>
     <div class="card">
       <div class="note" id="gpsInfo"></div>
-      <div class="note" id="verNote">INTER ZERO Web版 2.4.3</div>
+      <div class="note" id="verNote">INTER ZERO Web版 2.4.4</div>
       <div class="note">音声：VOICEVOX:四国めたん</div>
     </div>
   </section>
@@ -1390,7 +1395,7 @@ document.addEventListener('pointerup', () => {
   if (!$('start').classList.contains('off') || !orientWrong()) return;
   if (NATIVE) lockOrient(); else if (matchMedia('(pointer:coarse)').matches) goFull(); else lockOrient();
 }, true);
-if (NATIVE) { try { $('verNote').textContent = 'INTER ZERO アプリ版 ' + NATIVE.version() + '（画面 Web版 2.4.3）'; } catch (e) {} }
+if (NATIVE) { try { $('verNote').textContent = 'INTER ZERO アプリ版 ' + NATIVE.version() + '（画面 Web版 2.4.4）'; } catch (e) {} }
 // 起動ロゴ：タップで飛ばせる・終わったら消す
 (() => { const sp = $('splash'); const end = () => sp.remove();
   sp.addEventListener('pointerdown', end); setTimeout(end, 2500); })();
