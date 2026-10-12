@@ -41,16 +41,17 @@ button:active{background:#333}
 /* 定刻でチェックインできる1分間はゆっくり点滅 */
 #ciBtn.blink{border:2px solid var(--ok);animation:ciBlink 1.6s ease-in-out infinite}
 @keyframes ciBlink{50%{background:#0b4d27}}
-/* SSスタート（ARM方式：1分前を切ったら押す→次の00秒でスタート） */
-#ssGo{flex:2;height:64px;font-size:20px;font-weight:800;color:var(--ok);line-height:1.1;display:none;flex-direction:column;align-items:center;justify-content:center}
-#ssGo small{font-size:12px;font-weight:400;margin-top:3px;color:var(--dim)}
-#ssGo.armed{border:2px solid var(--ok)}
-#ssGo.pend{color:var(--amber);border:2px solid var(--amber)}
-#ctrl.ss #ssGo{display:flex}
+/* SSスタート待ち（ARM方式：1分前を切ったらINTERの枠をタップ→次の00秒でスタート）
+   INTERの枠がスタートボタン、速度は消してカウントダウンを縦いっぱいに */
 #ctrl.ss #ciBtn{display:none}
+#view-drive.sswait #interP{cursor:pointer;border:3px solid var(--amber)}
+#view-drive.sswait.armed #interP{border-color:var(--ok)}
+#view-drive.sswait #interP:active{background:#2a2a2a}
+#view-drive.sswait #spdP{display:none}
+#view-drive.sswait #interP .fit{justify-content:center}
 #ciMinus,#ciPlus{flex:.8;height:64px;font-size:17px;font-weight:800;line-height:1.1}
 #ciMinus small,#ciPlus small{display:block;font-size:11px;font-weight:400;color:var(--dim)}
-@media (orientation:landscape){#ciBtn,#ssGo,#ciMinus,#ciPlus{height:46px}#ciBtn,#ssGo{font-size:17px;flex-direction:row;gap:10px}#ciBtn small,#ssGo small{margin:0}#ciMinus small,#ciPlus small{display:none}}
+@media (orientation:landscape){#ciBtn,#ciMinus,#ciPlus{height:46px}#ciBtn{font-size:17px;flex-direction:row;gap:10px}#ciBtn small{margin:0}#ciMinus small,#ciPlus small{display:none}}
 #center{display:contents}
 #top{grid-area:top;display:flex;flex-direction:column;gap:6px}
 #nums{grid-area:nums;display:flex;flex-direction:column;gap:6px;min-height:0}
@@ -68,7 +69,7 @@ button:active{background:#333}
   #top{flex-direction:row;align-items:center}
   #nums{flex:1;flex-direction:row}
   #nums > #interP{flex:2.3 1 0}#nums > #rcol{flex:1.3 1 0}
-  #view-drive.ssrun #nums > #rcol{flex:1.7 1 0}
+  #view-drive.ssrun #nums > #rcol,#view-drive.sswait #nums > #rcol{flex:1.7 1 0}
   .step{height:auto}
   #rstInter{font-size:28px}
 }
@@ -242,7 +243,6 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
       </div>
       <div id="ctrl">
         <button id="ciBtn"></button>
-        <button id="ssGo"></button>
         <button id="ciMinus">−1分<small id="ciMinusL">チェックイン</small></button>
         <button id="ciPlus">＋1分<small id="ciPlusL">チェックイン</small></button>
       </div>
@@ -302,7 +302,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
         <span class="grow note" id="ssDistV"></span>
       </div>
       <div class="row"><span class="grow" style="font-size:14px">スタートでINTERを0にする</span><button class="sw" id="swSsReset"></button></div>
-      <div class="row"><span class="grow" style="font-size:14px">スタート時刻はボタンで決める（スタート1分前を切ったら走行画面の「SSスタート」→次の00秒でスタート）</span><button class="sw" id="swSsBtn"></button></div>
+      <div class="row"><span class="grow" style="font-size:14px">スタート時刻はボタンで決める（スタート1分前を切ったら走行画面のSTART（INTERの枠）をタップ→次の00秒でスタート）</span><button class="sw" id="swSsBtn"></button></div>
       <div class="note">オフの時は、チェックインの時刻＋間隔（3分）でそのままスタートします。TWZなどでスタートが遅れることが多いので、オンがおすすめです。</div>
       <div class="note">30・15・10秒前は音声、5秒前から毎秒ビープでお知らせします。SS距離を入れておくと、その距離を走った時点で自動で終了し、目安タイムを記録します（入れていない時は、1分以上走ってから8秒止まったら終了）。正確なタイムはストップで言われたものを入力してください。</div>
     </div>
@@ -371,7 +371,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
     </div>
     <div class="card">
       <div class="note" id="gpsInfo"></div>
-      <div class="note" id="verNote">INTER ZERO Web版 2.0.0</div>
+      <div class="note" id="verNote">INTER ZERO Web版 2.1.0</div>
       <div class="note">音声：VOICEVOX:四国めたん</div>
     </div>
   </section>
@@ -535,8 +535,9 @@ function distBeep(a, b){
   const st = S.beepStep; if (!S.distBeep || !(st > 0) || b <= a || b < st) return;
   const k = Math.floor(b / st); if (k <= Math.floor(a / st)) return;
   const big = st >= 1000 ? 5000 : 1000;
-  beep(1500, 90);
-  if ((k * st) % big === 0) setTimeout(() => beep(1500, 90), 160);
+  // 走行音に負けないよう最大音量・スマホのスピーカーが一番大きく鳴る2.5kHz付近
+  beep(2500, 160, 1);
+  if ((k * st) % big === 0) setTimeout(() => beep(2500, 160, 1), 260);
 }
 // SSスタート：スタート時のTOTAL・通過タイム・スタート地点を決める（1回だけ）
 function ssBegin(total, pos){
@@ -601,7 +602,7 @@ const A = {
     S.tcLabel = nextLabel(S.tcLabel);
     if (S.nextIsSs) {
       const st = actual + S.ssGap * 60000;
-      // ボタン方式では予定のまま（スタート1分前に「SSスタート」で確定）
+      // ボタン方式では予定のまま（スタート1分前にINTERの枠のSTARTで確定）
       Object.assign(S, { ssStart:st, ssFinish:null, ssTent:S.ssBtnMode, secStart:st, secDur:0, nextIsSs:false }, ssFresh());
       if (row && row.dist > 0) S.ssDist = row.dist;
       lastSsCue = Infinity;
@@ -615,6 +616,7 @@ const A = {
   // 00秒を過ぎて2秒以内に押した時は「今スタートした」とみなしてその分に
   ssGo(){
     const n = now(), m0 = minFloor(n);
+    if (!S.ssTent && S.ssStart != null && S.ssStart > n && S.ssStart - n < 10000) return toast('スタート直前のため変更しません（ずらす時は±1分）');
     const st = n - m0 < 2000 ? m0 : m0 + 60000;
     const snap = { ssStart:S.ssStart, ssTent:S.ssTent, secStart:S.secStart };
     if (S.ssStart == null || S.ssFinish != null) Object.assign(S, { ssFinish:null }, ssFresh());
@@ -658,10 +660,10 @@ const A = {
 
 // ================= 音・声・振動 =================
 let ac = null;
-function beep(freq, ms){
+function beep(freq, ms, vol = 0.25){
   if (!ac) return;
   const o = ac.createOscillator(), g = ac.createGain();
-  o.frequency.value = freq; o.type = 'square'; g.gain.value = 0.25;
+  o.frequency.value = freq; o.type = 'square'; g.gain.value = vol;
   o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + ms / 1000);
 }
 // 録音の声（VOICEVOX:四国めたん）。voice/phrases.json の key＝say() に渡す文
@@ -779,7 +781,7 @@ function render(n){
 
   // 状況ストリップ（次のTCまでの時間は右の大きい枠に出す）
   let L = '区間未設定', Rt = 'TC・SSタブで入力', C = 'var(--dim)';
-  if (ssPend) { L = `${S.ssLabel} スタート待ち（予定 ${hm(S.ssStart)}）`; Rt = '1分前を切ったら下のボタン'; C = 'var(--amber)'; }
+  if (ssPend) { L = `${S.ssLabel} スタート待ち（予定 ${hm(S.ssStart)}）`; Rt = '1分前を切ったらSTARTをタップ'; C = 'var(--amber)'; }
   else if (ssCount) { L = `${S.ssLabel} スタート ${hms(S.ssStart)}`; Rt = 'あと ' + mmss(S.ssStart - n); C = S.ssStart - n <= 30000 ? 'var(--warn)' : 'var(--fg)'; }
   else if (ssRun && t == null) { L = `${S.ssLabel} 走行中`; Rt = ''; C = 'var(--ok)'; }
   else if (t != null) { L = `${S.tcLabel} 目標 ${hm(t)}`; [Rt, C] = tcWord(n, t); }
@@ -819,17 +821,14 @@ function render(n){
   box.className = 'panel' + (bl ? ' on ' + bcls : '');
   // SS枠が出ている間はTOTALを消して、その場所にSS枠を出す
   $('totP').style.display = bl ? 'none' : '';
-  // 下の段：ふだんはTCチェックイン、SSのスタート待ちは「SSスタート」、走行中は消す（右の「SS終了」だけ）
+  // 下の段：ふだんはTCチェックイン、SSのスタート待ちは±1分だけ（STARTはINTERの枠）、走行中は消す（右の「SS終了」だけ）
   const ssCtl = ssPend || ssCount;
   $('ctrl').classList.toggle('off', ssRun);
   $('ctrl').classList.toggle('ss', ssCtl);
   setText('ciMinusL', ssCtl ? 'スタート' : 'チェックイン'); setText('ciPlusL', ssCtl ? 'スタート' : 'チェックイン');
-  if (ssCtl) {
-    const html = ssPend ? `${S.ssLabel} スタート<small>1分前を切ったら押す→次の00秒</small>`
-      : `スタート ${hms(S.ssStart)}<small>押し直すと次の00秒に</small>`;
-    if ($('ssGo').innerHTML !== html) $('ssGo').innerHTML = html;
-    $('ssGo').className = ssPend ? 'pend' : 'armed';
-  } else if (!ssRun) {
+  $('view-drive').classList.toggle('sswait', ssCtl);
+  $('view-drive').classList.toggle('armed', ssCount);
+  if (!ssCtl && !ssRun) {
     const a = ciActual();
     const d = t != null ? Math.round((a - t) / 60000) : null;
     const sub = d == null ? '目標未設定' : d === 0 ? '定刻' : d > 0 ? `遅着 ${d}分` : `早着 ${-d}分`;
@@ -847,15 +846,17 @@ function render(n){
 
   // 距離（SS走行中もINTER＝SSの距離。タイムは出さない）
   const iv = interShown();
-  const is = tcBig ? tv : km(iv), ts = km(totalShown());
-  setText('inter', is); $('inter').classList.toggle('neg', !tcBig && S.interDown && iv < 0);
-  $('inter').style.color = tcBig ? tc : '';
+  // SSのスタート待ちはINTERの枠がスタートボタン（スタート前にINTERは要らない）
+  const is = ssCtl ? 'START' : tcBig ? tv : km(iv), ts = km(totalShown());
+  setText('inter', is); $('inter').classList.toggle('neg', !tcBig && !ssCtl && S.interDown && iv < 0);
+  $('inter').style.color = ssCtl ? (ssPend ? 'var(--amber)' : 'var(--ok)') : tcBig ? tc : '';
   setText('total', ts);
   // 桁数に合わせて文字を最大化（12.34なら5桁ぶん、123.45になったら6桁ぶん）
-  $('inter').style.setProperty('--ch', Math.max(is.length, tcBig ? 4 : 5));
+  $('inter').style.setProperty('--ch', ssCtl ? 6.5 : Math.max(is.length, tcBig ? 4 : 5));
   $('total').style.setProperty('--ch', Math.max(ts.length, 5));
   setText('speed', String(Math.round(R.speed)));
-  setText('interLab', tcBig ? `${S.tcLabel} 目標 ${hm(t)}　${tlab}（タップで距離に戻す）`
+  setText('interLab', ssCtl ? (ssPend ? `${S.ssLabel} スタート：1分前を切ったらここをタップ → 次の00秒`
+      : `${S.ssLabel} スタート ${hms(S.ssStart)}（押し直すと次の00秒）`) : tcBig ? `${S.tcLabel} 目標 ${hm(t)}　${tlab}（タップで距離に戻す）`
     : (ssRun ? `${S.ssLabel} ` : '') + (S.interDown ? 'INTER ▼ 残り km' : 'INTER km'));
   $('badges').innerHTML = (S.frozen ? '<span class="badge">FREEZE</span>' : '') + (S.calibActive ? ' <span class="badge c">校正中</span>' : '');
   setText('stepL1', S.step + 'm'); setText('stepL2', S.step + 'm');
@@ -886,7 +887,7 @@ function renderTc(n){
   const st = S.ssStart;
   let h = '';
   if (st != null && S.ssFinish == null && S.ssTent) {
-    h = `<div class="num big2" style="color:var(--amber)">予定 ${hm(st)}（未確定）</div><div class="note">スタート1分前を切ったら走行画面の「SSスタート」を押してください。次の00秒がスタートになります。</div>`;
+    h = `<div class="num big2" style="color:var(--amber)">予定 ${hm(st)}（未確定）</div><div class="note">スタート1分前を切ったら走行画面のSTART（INTERの枠）をタップしてください。次の00秒がスタートになります。</div>`;
   } else if (st != null && S.ssFinish == null) {
     h = `<div class="num big2">スタート ${hms(st)}</div>`;
     if (n < st) h += `<div class="num big3" style="color:${st - n <= 30000 ? 'var(--warn)' : 'var(--fg)'}">あと ${mmss(st - n)}</div>`;
@@ -1008,10 +1009,13 @@ on('ciBtn', () => { A.checkIn(); flash('ciBtn'); });
 // ±1分：ふだんはチェックイン時刻、SSのスタート待ちの間はスタート時刻
 on('ciMinus', () => { if ($('ctrl').classList.contains('ss')) A.ssShift(-60000); else ciDelta -= 60000; });
 on('ciPlus', () => { if ($('ctrl').classList.contains('ss')) A.ssShift(60000); else ciDelta += 60000; });
-on('ssGo', () => { A.ssGo(); flash('ssGo'); });
 // 次のTCまでの時間：小さい枠をタップで大きく、大きい方をタップで距離に戻す（動き出すまで自動では大きくしない）
 on('tcP', () => { if ($('view-drive').classList.contains('tcbig')) { R.tcPin = false; R.tcAutoOff = true; } else R.tcPin = true; });
-on('interP', () => { if ($('view-drive').classList.contains('tcbig')) { R.tcPin = false; R.tcAutoOff = true; } });
+on('interP', () => {
+  const v = $('view-drive');
+  if (v.classList.contains('sswait')) { A.ssGo(); flash('interP'); }
+  else if (v.classList.contains('tcbig')) { R.tcPin = false; R.tcAutoOff = true; }
+});
 $('rstInter').addEventListener('pointerdown', e => {
   e.preventDefault(); flash('rstInter');
   if ($('view-drive').classList.contains('ssrun')) A.ssFinish(null, true); else A.resetInter();
@@ -1226,7 +1230,7 @@ on('downEnd', () => A.down(null));
 document.querySelectorAll('[data-clk]').forEach(b => b.addEventListener('click', () => { S.manualOffset += +b.dataset.clk; save(); }));
 on('clk0', () => { S.manualOffset = 0; save(); });
 on('swVoice', () => { S.voice = !S.voice; save(); });
-on('swDistBeep', () => { S.distBeep = !S.distBeep; save(); if (S.distBeep) beep(1500, 90); });
+on('swDistBeep', () => { S.distBeep = !S.distBeep; save(); if (S.distBeep) beep(2500, 160, 1); });
 document.querySelectorAll('#beepSel button').forEach(b => b.addEventListener('click', () => { S.beepStep = +b.dataset.v; save(); }));
 on('fullBtn', goFull);
 document.querySelectorAll('#orientSel button').forEach(b => b.addEventListener('click', () => {
@@ -1339,7 +1343,7 @@ document.addEventListener('pointerup', () => {
   if (!$('start').classList.contains('off') || !orientWrong()) return;
   if (NATIVE) lockOrient(); else if (matchMedia('(pointer:coarse)').matches) goFull(); else lockOrient();
 }, true);
-if (NATIVE) { try { $('verNote').textContent = 'INTER ZERO アプリ版 ' + NATIVE.version() + '（画面 Web版 2.0.0）'; } catch (e) {} }
+if (NATIVE) { try { $('verNote').textContent = 'INTER ZERO アプリ版 ' + NATIVE.version() + '（画面 Web版 2.1.0）'; } catch (e) {} }
 // 起動ロゴ：タップで飛ばせる・終わったら消す
 (() => { const sp = $('splash'); const end = () => sp.remove();
   sp.addEventListener('pointerdown', end); setTimeout(end, 2500); })();
