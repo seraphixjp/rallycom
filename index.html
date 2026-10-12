@@ -167,10 +167,13 @@ input:focus{outline:none;border-color:var(--amber)}
 .tog.on small{color:#063}
 table{width:100%;border-collapse:collapse;font-size:15px}
 /* 区間表 */
-#planList .row{flex-wrap:nowrap;gap:3px;padding:4px 2px;border-bottom:1px solid var(--line);border-radius:6px}
-#planList .row.cur{background:#1a1400}
-#planList input,#planEd .ps input{width:50px;height:50px;font-size:24px;padding:0}
-#planList input.pd{width:70px;font-size:22px}
+#planList .prow{padding:4px 2px;border-bottom:1px solid var(--line);border-radius:6px;display:flex;flex-direction:column;gap:4px}
+#planList .prow.cur{background:#1a1400}
+#planList .row{flex-wrap:nowrap;gap:3px}
+#planList input{width:50px;height:50px;font-size:24px;padding:0}
+#planList input.pd{width:90px;font-size:22px}
+#planList .pdrow{padding-left:51px}
+#planList .pdrow.off{display:none}
 #planList .pl{width:48px;font-size:15px;font-weight:700;flex:0 0 auto;display:flex;flex-direction:column;line-height:1.2}
 #planList .pss{height:50px;width:48px;padding:0;font-size:13px;flex:0 0 auto}
 #planList .pss.on{background:var(--ok);color:#000}
@@ -257,8 +260,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
       <div class="row"><h3 class="grow">区間表（TCの目標時刻をまとめて入力）</h3><button class="b" id="planToggle">開く</button></div>
       <div id="planSum" class="note"></div>
       <div id="planEd" style="display:none">
-        <div class="note">タイムカード・ロードブックのTC目標時刻を順に入れます。各区間の所要時間に直して使うので、遅着しても次からの目標は正しくずれます。「次SS」はそのTCの次がSSのとき（SS距離も入れておくと自動終了に使います）。</div>
-        <div class="row ps"><span class="note">スタート時刻</span><input class="kp" type="text" id="planSH" readonly data-len="2"> : <input class="kp" type="text" id="planSM" readonly data-len="2"></div>
+        <div class="note">タイムカード・アイテナリーの目標時刻を、スタート（TC0）から順に入れるだけです。時刻の差を各区間の所要時間として使うので、遅着しても次からの目標は正しくずれます（先頭車の時刻のままでも、TC0だけ自分の時刻にすれば使えます）。「次SS」はそのTCの次がSSのとき。押すとSS距離の欄が出ます（自動終了に使います）。</div>
         <div id="planList"></div>
         <div class="row" style="margin-top:8px"><button class="b grow" id="planAdd">＋ TCを追加</button></div>
         <div class="row"><button class="b grow okc" id="planGo" style="height:56px">この表で開始</button><button class="b badc" id="planClear" data-long="planClear" data-hint="長押しで表を消す">表を消す</button></div>
@@ -271,14 +273,15 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
       <div class="row">
         <input class="kp" type="text" id="secH" readonly data-len="2"> :
         <input class="kp" type="text" id="secM" readonly data-len="2"> ＋
-        <input class="kp" type="text" id="secD" readonly> <span class="note">分</span>
-      </div>
-      <div class="row">
-        <button class="b grow" id="setSection">目標を設定</button>
-        <button class="b grow" id="nowStart">今をスタートに</button>
+        <input class="kp" type="text" id="secD" readonly data-end="1"> <span class="note">分</span>
+        <button class="b" id="nowStart">今をスタートに</button>
       </div>
       <button class="tog" id="swNextSs"></button>
-      <div class="row" id="gapRow"><span class="note">間隔</span><button class="b" id="gapM">−1分</button><b id="gapV"></b><button class="b" id="gapP">＋1分</button></div>
+      <div id="ssDistRow">
+        <div class="row"><span class="note">SS距離</span><input type="text" id="ssDistIn" class="kp w" readonly data-dec="1" data-end="1"><span class="note">km</span><span class="grow note" id="ssDistV"></span></div>
+        <div class="row" id="gapRow"><span class="note">SSまでの間隔</span><button class="b" id="gapM">−1分</button><b id="gapV"></b><button class="b" id="gapP">＋1分</button></div>
+      </div>
+      <button class="b big okc" id="setSection">目標を設定</button>
       <div class="note">チェックインは走行画面の下のボタンで記録します。</div>
     </div>
     <div class="card">
@@ -288,21 +291,10 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
       <div id="ssInfo"></div>
       <button class="b big" id="ssFin" style="display:none">SSを手動で終了（ふつうは止まると自動で終了）</button>
       <button class="b big okc" id="ssTimeBtn" style="display:none">SSタイムを入力</button>
-      <div class="row">
-        <span class="note">スタート時刻</span>
-        <input class="kp" type="text" id="ssH" readonly data-len="2"> :
-        <input class="kp" type="text" id="ssMi" readonly data-len="2" data-end="1">
-        <button class="b" id="ssSet">設定</button>
-        <button class="b" id="ssClear">取消</button>
-      </div>
-      <div class="row">
-        <span class="note">SS距離</span>
-        <input type="text" id="ssDistIn" class="kp w" readonly data-dec="1"><span class="note">km</span>
-        <button class="b" id="ssDistSet">設定</button>
-        <span class="grow note" id="ssDistV"></span>
-      </div>
+      <div class="row"><button class="b grow" id="ssWait">SSのスタート待ちにする</button><button class="b" id="ssClear">取消</button></div>
+      <div class="note">ふつうは「次はSS」をONにしてチェックインすれば自動でスタート待ちになります。チェックインし忘れた時だけ使ってください。</div>
       <div class="row"><span class="grow" style="font-size:14px">スタートでINTERを0にする</span><button class="sw" id="swSsReset"></button></div>
-      <div class="row"><span class="grow" style="font-size:14px">スタート時刻はボタンで決める（スタート1分前を切ったら走行画面のSTART（INTERの枠）をタップ→次の00秒でスタート）</span><button class="sw" id="swSsBtn"></button></div>
+      <div class="row"><span class="grow" style="font-size:14px">スタート時刻はボタンで決める（スタート1分前を切ったら走行画面のSTANDBY（INTERの枠）をタップ→次の00秒でスタート）</span><button class="sw" id="swSsBtn"></button></div>
       <div class="note">オフの時は、チェックインの時刻＋間隔（3分）でそのままスタートします。TWZなどでスタートが遅れることが多いので、オンがおすすめです。</div>
       <div class="note">30・15・10秒前は音声、5秒前から毎秒ビープでお知らせします。SS距離を入れておくと、その距離を走った時点で自動で終了し、目安タイムを記録します（入れていない時は、1分以上走ってから8秒止まったら終了）。正確なタイムはストップで言われたものを入力してください。</div>
     </div>
@@ -371,7 +363,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
     </div>
     <div class="card">
       <div class="note" id="gpsInfo"></div>
-      <div class="note" id="verNote">INTER ZERO Web版 2.2.0</div>
+      <div class="note" id="verNote">INTER ZERO Web版 2.3.0</div>
       <div class="note">音声：VOICEVOX:四国めたん</div>
     </div>
   </section>
@@ -605,7 +597,7 @@ const A = {
     S.tcLabel = nextLabel(S.tcLabel);
     if (S.nextIsSs) {
       const st = actual + S.ssGap * 60000;
-      // ボタン方式では予定のまま（スタート1分前にINTERの枠のSTARTで確定）
+      // ボタン方式では予定のまま（スタート1分前にINTERの枠のSTANDBYで確定）
       Object.assign(S, { ssStart:st, ssFinish:null, ssTent:S.ssBtnMode, secStart:st, secDur:0, nextIsSs:false }, ssFresh());
       if (row && row.dist > 0) S.ssDist = row.dist;
       lastSsCue = Infinity;
@@ -784,7 +776,7 @@ function render(n){
 
   // 状況ストリップ（次のTCまでの時間は右の大きい枠に出す）
   let L = '区間未設定', Rt = 'TC・SSタブで入力', C = 'var(--dim)';
-  if (ssPend) { L = `${S.ssLabel} スタート待ち（予定 ${hm(S.ssStart)}）`; Rt = '1分前を切ったらSTARTをタップ'; C = 'var(--amber)'; }
+  if (ssPend) { L = `${S.ssLabel} スタート待ち（予定 ${hm(S.ssStart)}）`; Rt = '1分前を切ったらSTANDBYをタップ'; C = 'var(--amber)'; }
   else if (ssCount) { L = `${S.ssLabel} スタート ${hms(S.ssStart)}`; Rt = 'あと ' + mmss(S.ssStart - n); C = S.ssStart - n <= 30000 ? 'var(--warn)' : 'var(--fg)'; }
   else if (ssRun && t == null) { L = `${S.ssLabel} 走行中`; Rt = ''; C = 'var(--ok)'; }
   else if (t != null) { L = `${S.tcLabel} 目標 ${hm(t)}`; [Rt, C] = tcWord(n, t); }
@@ -824,7 +816,7 @@ function render(n){
   box.className = 'panel' + (bl ? ' on ' + bcls : '');
   // SS枠が出ている間はTOTALを消して、その場所にSS枠を出す
   $('totP').style.display = bl ? 'none' : '';
-  // 下の段：ふだんはTCチェックイン、SSのスタート待ちは±1分だけ（STARTはINTERの枠）、走行中は消す（右の「SS終了」だけ）
+  // 下の段：ふだんはTCチェックイン、SSのスタート待ちは±1分だけ（STANDBYはINTERの枠）、走行中は消す（右の「SS終了」だけ）
   const ssCtl = ssPend || ssCount;
   $('ctrl').classList.toggle('off', ssRun);
   $('ctrl').classList.toggle('ss', ssCtl);
@@ -850,12 +842,12 @@ function render(n){
   // 距離（SS走行中もINTER＝SSの距離。タイムは出さない）
   const iv = interShown();
   // SSのスタート待ちはINTERの枠がスタートボタン（スタート前にINTERは要らない）
-  const is = ssCtl ? 'START' : tcBig ? tv : km(iv), ts = km(totalShown());
+  const is = ssCtl ? (ssPend ? 'STANDBY' : 'SS MODE') : tcBig ? tv : km(iv), ts = km(totalShown());
   setText('inter', is); $('inter').classList.toggle('neg', !tcBig && !ssCtl && S.interDown && iv < 0);
   $('inter').style.color = ssCtl ? (ssPend ? 'var(--amber)' : 'var(--ok)') : tcBig ? tc : '';
   setText('total', ts);
   // 桁数に合わせて文字を最大化（12.34なら5桁ぶん、123.45になったら6桁ぶん）
-  $('inter').style.setProperty('--ch', ssCtl ? 6.5 : Math.max(is.length, tcBig ? 4 : 5));
+  $('inter').style.setProperty('--ch', ssCtl ? 8.5 : Math.max(is.length, tcBig ? 4 : 5));
   $('total').style.setProperty('--ch', Math.max(ts.length, 5));
   setText('speed', String(Math.round(R.speed)));
   setText('interLab', ssCtl ? (ssPend ? `${S.ssLabel} スタート：1分前を切ったらここをタップ → 次の00秒`
@@ -882,6 +874,7 @@ function renderTc(n){
   const ns = S.nextIsSs ? `次はSS：ON<small>${S.ssBtnMode ? `スタート予定はチェックイン＋${S.ssGap}分（走行画面のボタンで確定）` : `チェックイン＋${S.ssGap}分でSSスタート`}</small>` : `次はSS：OFF<small>タップでON（このTCの次がSSのとき）</small>`;
   if ($('swNextSs').innerHTML !== ns) $('swNextSs').innerHTML = ns;
   $('swNextSs').classList.toggle('on', S.nextIsSs);
+  $('ssDistRow').style.display = S.nextIsSs || (S.ssStart != null && S.ssFinish == null) ? '' : 'none';
   $('gapRow').style.display = S.nextIsSs ? '' : 'none'; setText('gapV', S.ssGap + '分');
   setText('planSum', S.planIdx != null && S.plan[S.planIdx]
     ? `使用中：${S.planIdx + 1} / ${S.plan.length}区間（次は ${S.plan[S.planIdx].l}）`
@@ -890,7 +883,7 @@ function renderTc(n){
   const st = S.ssStart;
   let h = '';
   if (st != null && S.ssFinish == null && S.ssTent) {
-    h = `<div class="num big2" style="color:var(--amber)">予定 ${hm(st)}（未確定）</div><div class="note">スタート1分前を切ったら走行画面のSTART（INTERの枠）をタップしてください。次の00秒がスタートになります。</div>`;
+    h = `<div class="num big2" style="color:var(--amber)">予定 ${hm(st)}（未確定）</div><div class="note">スタート1分前を切ったら走行画面のSTANDBY（INTERの枠）をタップしてください。次の00秒がスタートになります。</div>`;
   } else if (st != null && S.ssFinish == null) {
     h = `<div class="num big2">スタート ${hms(st)}</div>`;
     if (n < st) h += `<div class="num big3" style="color:${st - n <= 30000 ? 'var(--warn)' : 'var(--fg)'}">あと ${mmss(st - n)}</div>`;
@@ -903,7 +896,7 @@ function renderTc(n){
   if ($('ssInfo').innerHTML !== h) $('ssInfo').innerHTML = h;
   $('ssFin').style.display = (st != null && S.ssFinish == null && !S.ssTent && n >= st) ? '' : 'none';
   $('ssTimeBtn').style.display = (S.ssAwait ?? lastUntimed()) != null ? '' : 'none';
-  setText('ssDistV', S.ssDist > 0 ? `設定中 ${km(S.ssDist)} km` : '未設定（止まったら終了）');
+  setText('ssDistV', S.ssDist > 0 ? '' : '空欄なら止まったら終了');
   $('swSsReset').classList.toggle('on', S.ssResetTrips);
   $('swSsBtn').classList.toggle('on', S.ssBtnMode);
 }
@@ -1037,7 +1030,6 @@ function fillTcInputs(){
   if (S.secStart != null) { const d = new Date(S.secStart); $('secH').value = p2(d.getHours()); $('secM').value = p2(d.getMinutes()); } else { $('secH').value = ''; $('secM').value = ''; }
   $('secD').value = S.secDur > 0 ? S.secDur : '';
   $('ssDistIn').value = S.ssDist > 0 ? (S.ssDist / 1000).toFixed(2) : '';
-  if (S.ssStart != null) { const d = new Date(S.ssStart); $('ssH').value = p2(d.getHours()); $('ssMi').value = p2(d.getMinutes()); } else { $('ssH').value = ''; $('ssMi').value = ''; }
 }
 $('tcLabel').addEventListener('change', e => { S.tcLabel = e.target.value || 'TC'; save(); });
 $('ssLabel').addEventListener('change', e => { S.ssLabel = e.target.value || 'SS'; save(); });
@@ -1045,25 +1037,26 @@ $('ssCourse').addEventListener('change', e => { S.ssCourse = e.target.value.trim
 on('setSection', () => {
   const h = parseInt($('secH').value), m = parseInt($('secM').value), d = parseInt($('secD').value) || 0;
   if (!(h >= 0 && h <= 23 && m >= 0 && m <= 59)) return toast('時刻を確認してください');
-  S.secStart = minuteToday(h, m); S.secDur = Math.max(0, Math.min(1440, d)); save(); toast('目標を設定しました');
+  S.secStart = minuteToday(h, m); S.secDur = Math.max(0, Math.min(1440, d)); ssDistEdited();
+  toast(`目標を設定しました（${S.tcLabel} ${hm(targetMs() ?? S.secStart)}）`);
 });
 on('nowStart', () => { const d = new Date(minFloor(now())); $('secH').value = p2(d.getHours()); $('secM').value = p2(d.getMinutes()); });
 on('swNextSs', () => { S.nextIsSs = !S.nextIsSs; save(); });
 on('gapM', () => { S.ssGap = Math.max(0, S.ssGap - 1); save(); });
 on('gapP', () => { S.ssGap = Math.min(30, S.ssGap + 1); save(); });
-on('ssSet', () => {
-  const h = parseInt($('ssH').value), m = parseInt($('ssMi').value);
-  if (!(h >= 0 && h <= 23 && m >= 0 && m <= 59)) return toast('時刻を確認してください');
-  const st = minuteToday(h, m);
-  Object.assign(S, { ssStart:st, ssFinish:null, ssTent:false, secStart:st, secDur:S.planIdx != null ? (planDurs()[S.planIdx] || 0) : 0 }, ssFresh()); lastSsCue = Infinity; save(); toast('SSスタートを設定しました');
+// チェックインし忘れた時：今から間隔（3分）後を予定にしてスタート待ちに
+on('ssWait', () => {
+  const st = minFloor(now()) + S.ssGap * 60000;
+  Object.assign(S, { ssStart:st, ssFinish:null, ssTent:S.ssBtnMode, secStart:st, secDur:S.planIdx != null ? (planDurs()[S.planIdx] || 0) : 0 }, ssFresh());
+  lastSsCue = Infinity; save(); toast(S.ssBtnMode ? 'スタート待ちにしました（走行画面のSTANDBYで確定）' : `SSスタート ${hm(st)}`);
 });
 on('ssClear', () => { S.ssStart = null; S.ssFinish = null; S.ssTent = false; Object.assign(S, ssFresh()); save(); fillTcInputs(); });
 on('ssFin', () => A.ssFinish(null, true));
-on('ssDistSet', () => {
+// SS距離：打つたびに反映（設定ボタンは無し）
+function ssDistEdited(){
   const v = parseFloat($('ssDistIn').value);
-  if (!(v > 0 && v < 100)) { S.ssDist = 0; save(); return toast('SS距離を消しました（止まったら終了）'); }
-  S.ssDist = Math.round(v * 1000); save(); toast(`SS距離 ${km(S.ssDist)} km`);
-});
+  S.ssDist = v > 0 && v < 100 ? Math.round(v * 1000) : 0; save();
+}
 let dlgIdx = null;
 function openSsDlg(i){
   const r = S.ssRecords[i]; if (!r) return; dlgIdx = i;
@@ -1129,19 +1122,22 @@ function applyPlan(){
   S.tcLabel = r.l; S.secDur = planDurs()[S.planIdx] || 0; S.nextIsSs = r.ss;
 }
 function renderPlan(){
-  $('planSH').value = S.planStart != null ? p2(Math.floor(S.planStart / 60)) : '';
-  $('planSM').value = S.planStart != null ? p2(S.planStart % 60) : '';
-  $('planList').innerHTML = S.plan.map((r, i) => `<div class="row${i === S.planIdx ? ' cur' : ''}" data-i="${i}">
+  // 1行目はスタート（TC0）の時刻。目標時刻だけの表として入れられるよう、TCと同じ並びに置く
+  const st = S.planStart;
+  $('planList').innerHTML = `<div class="prow"><div class="row">
+    <span class="pl">TC0<span class="pdur">スタート</span></span>
+    <input class="kp" type="text" id="planSH" readonly data-len="2" value="${st != null ? p2(Math.floor(st / 60)) : ''}">:<input class="kp" type="text" id="planSM" readonly data-len="2" value="${st != null ? p2(st % 60) : ''}"></div></div>`
+    + S.plan.map((r, i) => `<div class="prow${i === S.planIdx ? ' cur' : ''}" data-i="${i}"><div class="row">
     <span class="pl">${r.l}<span class="pdur"></span></span>
     <input class="kp ph" type="text" readonly data-len="2" value="${r.tm != null ? p2(Math.floor(r.tm / 60)) : ''}">:<input class="kp pm" type="text" readonly data-len="2" value="${r.tm != null ? p2(r.tm % 60) : ''}">
     <button class="b pss${r.ss ? ' on' : ''}">次SS</button>
-    <input class="kp pd" type="text" readonly data-dec="1" placeholder="km" value="${r.dist > 0 ? (r.dist / 1000).toFixed(2) : ''}" style="visibility:${r.ss ? 'visible' : 'hidden'}">
-    <button class="b pdel">×</button></div>`).join('');
+    <button class="b pdel">×</button></div>
+    <div class="row pdrow${r.ss ? '' : ' off'}"><span class="note">SS距離</span><input class="kp pd" type="text" readonly data-dec="1" placeholder="km" value="${r.dist > 0 ? (r.dist / 1000).toFixed(2) : ''}"><span class="note">km</span></div></div>`).join('');
   planDurText();
 }
 function planDurText(){
   const ds = planDurs();
-  document.querySelectorAll('#planList .row').forEach((e, i) => {
+  document.querySelectorAll('#planList .prow[data-i]').forEach((e, i) => {
     e.querySelector('.pdur').textContent = ds[i] ? `${ds[i]}分` : S.plan[i].tm != null ? '?' : '';
   });
 }
@@ -1149,7 +1145,7 @@ function planDurText(){
 function planCollect(){
   const h = parseInt($('planSH').value), m = parseInt($('planSM').value);
   S.planStart = tmOf(h, m);
-  document.querySelectorAll('#planList .row').forEach(e => {
+  document.querySelectorAll('#planList .prow[data-i]').forEach(e => {
     const r = S.plan[+e.dataset.i]; if (!r) return;
     r.tm = tmOf(parseInt(e.querySelector('.ph').value), parseInt(e.querySelector('.pm').value));
     const d = parseFloat(e.querySelector('.pd').value); r.dist = d > 0 && d < 100 ? Math.round(d * 1000) : 0;
@@ -1165,10 +1161,10 @@ on('planAdd', () => {
   const last = S.plan.at(-1);
   S.plan.push({ l:last ? nextLabel(last.l) : S.tcLabel, tm:null, ss:false, dist:0 });
   save(); renderPlan();
-  openKp(document.querySelector('#planList .row:last-child .ph'));
+  openKp(document.querySelector('#planList .prow:last-child .ph'));
 });
 $('planList').addEventListener('click', e => {
-  const row = e.target.closest('.row'); if (!row) return;
+  const row = e.target.closest('.prow[data-i]'); if (!row) return;
   const i = +row.dataset.i;
   if (e.target.classList.contains('pss')) { planCollect(); S.plan[i].ss = !S.plan[i].ss; if (S.planIdx === i) S.nextIsSs = S.plan[i].ss;
     if (S.planIdx != null) S.secDur = planDurs()[S.planIdx] || S.secDur; save(); renderPlan(); }
@@ -1269,7 +1265,7 @@ function closeKp(){
 }
 function kpNext(){
   if (!kpEl) return;
-  const scope = kpEl.closest('.row')?.parentElement || document;
+  const scope = kpEl.closest('#planList') || kpEl.closest('.row')?.parentElement || document;
   const all = [...scope.querySelectorAll('input.kp')].filter(e => e.offsetParent && getComputedStyle(e).visibility !== 'hidden');
   const i = all.indexOf(kpEl);
   if (i >= 0 && i < all.length - 1 && !kpEl.dataset.end) openKp(all[i + 1]); else kpCloseAfterTap = true;
@@ -1284,13 +1280,14 @@ function kpKey(k){
   const el = kpEl; if (!el) return;
   if (k === 'done') { kpCloseAfterTap = true; return; }
   if (k === 'next') return kpNext();
-  if (k === 'bs') { el.dataset.fresh = ''; el.value = el.value.slice(0, -1); if (el.closest('#planEd')) planEdited(); return; }
+  if (k === 'bs') { el.dataset.fresh = ''; el.value = el.value.slice(0, -1); if (el.closest('#planEd')) planEdited(); if (el.id === 'ssDistIn') ssDistEdited(); return; }
   if (el.dataset.fresh) { el.value = ''; el.dataset.fresh = ''; }
   if (k === '.' && (!el.dataset.dec || el.value.includes('.'))) return;
   const len = +el.dataset.len || 0;
   if (len && el.value.length >= len) return;
   el.value += k;
   if (el.closest('#planEd')) planEdited();
+  if (el.id === 'ssDistIn') ssDistEdited();
   if (len && el.value.length >= len) kpNext();   // 時・分は2桁で次の欄へ
 }
 // 入力欄（区間表のように後から増える欄も）を触ったらテンキーを開く
@@ -1348,7 +1345,7 @@ document.addEventListener('pointerup', () => {
   if (!$('start').classList.contains('off') || !orientWrong()) return;
   if (NATIVE) lockOrient(); else if (matchMedia('(pointer:coarse)').matches) goFull(); else lockOrient();
 }, true);
-if (NATIVE) { try { $('verNote').textContent = 'INTER ZERO アプリ版 ' + NATIVE.version() + '（画面 Web版 2.2.0）'; } catch (e) {} }
+if (NATIVE) { try { $('verNote').textContent = 'INTER ZERO アプリ版 ' + NATIVE.version() + '（画面 Web版 2.3.0）'; } catch (e) {} }
 // 起動ロゴ：タップで飛ばせる・終わったら消す
 (() => { const sp = $('splash'); const end = () => sp.remove();
   sp.addEventListener('pointerdown', end); setTimeout(end, 2500); })();

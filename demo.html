@@ -206,7 +206,7 @@ async function run(){
     D.S.ssRecords[0].sp = [car.lat, car.lon];   // 前回の「赤城」は同じ場所からスタートした
     await tap('#ciBtn'); ring('#ssBox'); await wait(5500);
 
-    cap(6, 'SSスタート', 'スタート待ちの間は<b>INTERの枠がSTARTボタン</b>。<b>1分前を切ったら1タップ</b>→<b>次の00秒</b>がスタート。TWZなどでスタートが遅れても合わせられます。<b>30・15・10秒前は音声</b>、<b>5秒前から毎秒ビープ</b>。');
+    cap(6, 'SSスタート', 'スタート待ちの間は<b>INTERの枠が「STANDBY」ボタン</b>。<b>1分前を切ったら1タップ</b>で「SS MODE」に変わり、<b>次の00秒</b>がスタート。TWZなどでスタートが遅れても合わせられます。<b>30・15・10秒前は音声</b>、<b>5秒前から毎秒ビープ</b>。');
     jumpTo(at(9, 31, 15)); ring('#interP'); await untilV(at(9, 31, 19)); await tap('#interP'); ring('#ssBox'); await untilV(at(9, 31, 33)); jumpTo(at(9, 31, 44, 300)); await untilV(at(9, 31, 59, 400));
 
     cap(7, 'SS走行中', 'SS中は<b>距離だけ</b>。INTERの枠が<b>SSの距離</b>、右の枠が<b>残り距離</b>（ロストした時・パンクで交換するか決める時に）。<b>500mごとにビープ</b>が鳴ります。');
