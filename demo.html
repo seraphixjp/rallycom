@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0b0b0d">
+<title>ラリコン デモ</title>
+<link rel="icon" href="icon-192.png">
+<style>
+:root{--bg:#0b0b0d;--card:#16161a;--line:#2a2a30;--fg:#f2f2f2;--dim:#a0a0a8;--amber:#ffb300;--ok:#00e676}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Hiragino Sans","Yu Gothic UI",sans-serif}
+body{min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:16px}
+header{width:100%;max-width:960px;display:flex;align-items:center;gap:12px;margin-bottom:12px}
+header img{height:26px;filter:brightness(1.1)}
+header h1{font-size:18px;margin:0;font-weight:800;letter-spacing:.04em}
+header span{color:var(--dim);font-size:13px}
+#stageWrap{width:100%;max-width:960px;position:relative}
+#phone{position:relative;transform-origin:0 0;width:872px;height:418px;border-radius:30px;background:#000;border:2px solid #333;
+  box-shadow:0 0 0 6px #18181c,0 20px 50px rgba(0,0,0,.6);padding:12px}
+#phone iframe{width:844px;height:390px;border:0;border-radius:14px;display:block;background:#000;pointer-events:none}
+#phone.free iframe{pointer-events:auto}
+#ring{position:absolute;border:3px solid var(--amber);border-radius:12px;box-shadow:0 0 0 4px rgba(255,179,0,.25),0 0 24px rgba(255,179,0,.5);
+  pointer-events:none;opacity:0;transition:opacity .25s;z-index:3}
+#ring.on{opacity:1}
+.tapfx{position:absolute;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;background:rgba(255,255,255,.55);
+  pointer-events:none;z-index:4;animation:tap .5s ease-out forwards}
+@keyframes tap{from{transform:scale(.3);opacity:1}to{transform:scale(1.4);opacity:0}}
+#rate{position:absolute;right:26px;top:-10px;background:var(--amber);color:#000;font-weight:800;font-size:13px;padding:3px 10px;border-radius:20px;display:none;z-index:5}
+#cap{width:100%;max-width:960px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-top:16px;min-height:150px}
+#capHead{display:flex;align-items:baseline;gap:10px}
+#capNo{color:var(--amber);font-weight:800;font-size:14px;white-space:nowrap}
+#capT{font-size:21px;font-weight:800;margin:0}
+#capB{font-size:16px;line-height:1.75;color:#dcdce0;margin:8px 0 0}
+#capB b{color:var(--amber);font-weight:700}
+#bar{height:4px;background:var(--line);border-radius:2px;margin-top:14px;overflow:hidden}
+#barIn{height:100%;width:0;background:var(--amber);transition:width .4s}
+#ctl{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+#ctl button{background:#222228;color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:10px 16px;font-size:15px;cursor:pointer;min-height:44px}
+#ctl button:hover{background:#2c2c33}
+#ctl .grow{flex:1}
+#intro{position:absolute;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+  background:rgba(5,5,7,.88);border-radius:30px;cursor:pointer;text-align:center;padding:16px}
+#intro img{width:min(260px,50%)}
+#intro .t{font-size:26px;font-weight:800}
+#intro .s{color:var(--dim);font-size:14px}
+#intro .play{width:78px;height:78px;border-radius:50%;background:var(--amber);display:flex;align-items:center;justify-content:center}
+#intro .play:after{content:"";border-left:26px solid #000;border-top:16px solid transparent;border-bottom:16px solid transparent;margin-left:7px}
+#intro.off{display:none}
+ul.sum{margin:8px 0 0;padding-left:1.2em;line-height:1.8;font-size:15px;color:#dcdce0}
+ul.sum b{color:var(--amber)}
+@media (max-width:600px){header span{display:none}#capT{font-size:18px}#capB{font-size:14.5px}#cap{padding:12px 14px}#ctl button{padding:8px 12px;font-size:14px}#intro .t{font-size:20px}}
+</style>
+</head>
+<body>
+<header><img src="seraphix-logo.png" alt="SERAPHIX"><h1>ラリコン</h1><span>Android用ラリーコンピューター　デモ</span></header>
+<div id="stageWrap">
+  <div id="phone"><iframe id="fw" src="index.html?demo=1" allow="autoplay"></iframe>
+    <div id="ring"></div><div id="rate"></div>
+    <div id="intro"><img src="seraphix-logo.png" alt=""><div class="play"></div><div class="t">デモを再生（約4分）</div>
+      <div class="s">リエゾン → TCチェックイン → SS → タイム入力 までを自動で操作します。音が出ます。</div></div>
+  </div>
+</div>
+<section id="cap">
+  <div id="capHead"><span id="capNo"></span><h2 id="capT">ラリコン</h2></div>
+  <div id="capB">競技中に必要な情報だけを大きく。操作は1タップで、押し間違えても5秒以内なら元に戻せます。</div>
+  <div id="bar"><div id="barIn"></div></div>
+  <div id="ctl">
+    <button id="bPause">一時停止</button><button id="bSkip">次へ ▶▶</button><button id="bRestart">最初から</button>
+    <span class="grow"></span><button id="bFree">自分で触る</button>
+  </div>
+</section>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const fw = $('fw'), phone = $('phone');
+let W = null, D = null;   // iframeのwindow と window.__demo
+
+// ---------- 画面の大きさ ----------
+function fit(){
+  const avail = Math.min($('stageWrap').clientWidth, 960);
+  const s = Math.min(1, avail / 876);
+  phone.style.transform = `scale(${s})`;
+  $('stageWrap').style.height = (422 * s) + 'px';
+  phone.dataset.s = s;
+}
+addEventListener('resize', fit); fit();
+
+// ---------- デモの時計（倍速・一時停止・ジャンプ） ----------
+let vBase = 0, rBase = 0, rate = 1, paused = false, rateWant = 1;
+const V = () => vBase + (performance.now() - rBase) * rate;
+function setRate(r){ vBase = V(); rBase = performance.now(); rate = r; }
+function speed(r){ rateWant = r; if (!paused) setRate(r); $('rate').style.display = r > 1 ? 'block' : 'none'; $('rate').textContent = `早送り ×${r}`; }
+function jumpTo(t){ vBase += t - V(); car.lastV = V(); if (D) D.R.prev = null; }
+const at = (h, m, s = 0) => { const d = new Date(day0); d.setHours(h, m, s, 0); return d.getTime(); };
+let day0 = Date.now();
+
+// ---------- 待ち（一時停止で止まる・「次へ」で飛ばす） ----------
+let skipping = false, runId = 0;
+class Stop extends Error {}
+function frame(){ return new Promise(r => setTimeout(r, 50)); }
+async function wait(ms){ const id = runId; let left = ms, last = performance.now();
+  while (left > 0) { await frame(); if (id !== runId) throw new Stop(); if (skipping) return;
+    const n = performance.now(); if (!paused) left -= n - last; last = n; } }
+async function until(cond){ const id = runId; let fast = false;
+  while (!cond()) { await frame(); if (id !== runId) throw new Stop();
+    if (skipping && !fast) { fast = true; setRate(20); } }
+  if (fast) setRate(paused ? 0 : rateWant); }
+const untilV = t => until(() => V() >= t);
+
+// ---------- 車（GPSの代わり） ----------
+const car = { lat:36.4012, lon:139.0631, head:0.4, v:0, target:0, d:0, lastV:0, mode:'cruise', ssD0:0 };
+// SSの速度（m/s）：スタートから加速して、コーナーで落ちる
+const prof = d => 23 + 8 * Math.sin(d / 170) + 3 * Math.sin(d / 47 + 1);
+const ssV = d => Math.min(prof(d), Math.sqrt(0.25 + 2 * 5 * d));
+const prevV = d => ssV(d) * (d < 800 ? 1.035 : 0.93);   // 前回の走り（前半は速く、後半は遅い）
+const SS_LEN = 2000;
+function traceOf(vf){ const tr = [0]; let t = 0, tEnd = 0; for (let d = 0; d < SS_LEN + 100; d++) { t += 1 / vf(d + .5); if (d + 1 === SS_LEN) tEnd = t; if ((d + 1) % 100 === 0) tr.push(Math.round(t * 10)); } return { tr, t:tEnd }; }
+function feed(){
+  if (!D) return;
+  const now = V(); let dt = (now - car.lastV) / 1000; car.lastV = now;
+  D.R.running = true;
+  if (dt <= 0) { D.R.lastFix = performance.now(); return; }
+  // 長い間（一時停止明けなど）は0.5秒ずつに分けて流す
+  const n = Math.min(400, Math.ceil(dt / 0.5)), h = dt / n;
+  for (let i = 1; i <= n; i++) {
+    if (car.mode === 'ss') car.v = ssV(car.d - car.ssD0);
+    else { const a = car.v < car.target ? 2.5 : -4; car.v = car.v + a * h; if ((a > 0 && car.v > car.target) || (a < 0 && car.v < car.target)) car.v = car.target; }
+    const step = car.v * h; car.d += step;
+    car.head += step * 0.0004 * Math.sin(car.d / 400);
+    car.lat += step * Math.cos(car.head) / 111320; car.lon += step * Math.sin(car.head) / (111320 * Math.cos(car.lat * Math.PI / 180));
+    D.onPos(car.lat, car.lon, 4 + Math.random() * 2, car.v + (car.v > 1 ? (Math.random() - .5) * .3 : 0), now - (n - i) * h * 1000);
+  }
+}
+setInterval(feed, 200);
+
+// ---------- 画面の中の操作 ----------
+function rectOf(el){
+  const s = +phone.dataset.s, r = el.getBoundingClientRect();
+  return { x:12 + r.left, y:12 + r.top, w:r.width, h:r.height, s };
+}
+let ringEl = null;
+function ring(sel){ ringEl = sel ? W.document.querySelector(sel) : null; $('ring').classList.toggle('on', !!ringEl); }
+(function loop(){
+  if (ringEl) { const r = rectOf(ringEl), g = $('ring').style; g.left = (r.x - 5) + 'px'; g.top = (r.y - 5) + 'px'; g.width = (r.w + 10) + 'px'; g.height = (r.h + 10) + 'px'; }
+  requestAnimationFrame(loop);
+})();
+async function tap(sel){
+  const el = typeof sel === 'string' ? W.document.querySelector(sel) : sel; if (!el) return;
+  const r = rectOf(el), fx = document.createElement('div'); fx.className = 'tapfx';
+  fx.style.left = (r.x + r.w / 2) + 'px'; fx.style.top = (r.y + r.h / 2) + 'px'; phone.appendChild(fx); setTimeout(() => fx.remove(), 600);
+  const o = { bubbles:true, cancelable:true, pointerType:'touch', isPrimary:true };
+  el.dispatchEvent(new W.PointerEvent('pointerdown', o)); await wait(90);
+  el.dispatchEvent(new W.PointerEvent('pointerup', o)); el.dispatchEvent(new W.MouseEvent('click', o));
+  await wait(260);
+}
+async function keys(str){ for (const k of str) await tap(`#kp button[data-k="${k}"]`); }
+
+// ---------- 字幕 ----------
+const SCENES = 11;
+function cap(no, t, b){ $('capNo').textContent = no ? `${no} / ${SCENES}` : ''; $('capT').textContent = t; $('capB').innerHTML = b; $('barIn').style.width = (no / SCENES * 100) + '%'; skipping = false; }
+
+// ---------- 初期状態 ----------
+function setup(){
+  day0 = Date.now(); vBase = at(9, 26, 40); rBase = performance.now(); rate = 1; paused = false; speed(1);
+  Object.assign(car, { lat:36.4012, lon:139.0631, head:0.4, v:12.5, target:12.5, d:0, lastV:V(), mode:'cruise' });
+  D.setClock(V);
+  const S = D.S;
+  const prev = traceOf(prevV);
+  Object.assign(S, {
+    totalRaw:42380, interRaw:1250, tcLabel:'TC1', ssLabel:'SS3',
+    planStart:560, plan:[{ l:'TC1', tm:569, ss:true, dist:SS_LEN }, { l:'TC2', tm:605, ss:false, dist:0 }, { l:'TC3', tm:640, ss:true, dist:3150 }],
+    planIdx:0, secStart:at(9, 20), secDur:9, nextIsSs:true,
+    ssRecords:[
+      { l:'SS1', s:at(8, 5), f:at(8, 5) + prev.t * 1000, t:Math.round(prev.t * 10) * 100 + 300, by:'dist', d:SS_LEN, sp:null, tr:prev.tr, c:'赤城' },
+      { l:'SS2', s:at(8, 41), f:at(8, 43, 6), t:125300, by:'dist', d:3150, sp:[36.47, 138.91], tr:[], c:'榛名' },
+    ],
+  });
+  D.R.prev = null; D.resetCues(); D.save();
+}
+
+// ---------- シナリオ ----------
+async function run(){
+  const id = ++runId;
+  try {
+    setup();
+    cap(1, '走行画面', '大きな数字が<b>INTER（区間距離）</b>、右が<b>TOTAL</b>と<b>速度</b>。GPSのドップラー速度を積分して距離を出すので、カーブで距離が縮まず、<b>停車中に距離が増えることもありません</b>。文字は画面いっぱいに自動で大きくなります。');
+    ring('#interP'); await wait(4500); ring('#rcol'); await wait(4500);
+
+    cap(2, '距離の補正（＋ −）', 'コマ図の距離とずれたら、左の縦長ボタンで合わせます。1回<b>10m</b>（50m・100mに変更可）。ホルダーに付けたままでも押しやすい大きさです。Bluetoothのリモコンでも操作できます。');
+    ring('#adj'); await wait(1800);
+    for (let i = 0; i < 3; i++) { await tap('#plus'); await wait(250); }
+    await wait(500); await tap('#minus'); await wait(2200);
+
+    cap(3, 'INTER 0', '右の縦長ボタンを<b>1タップ</b>でINTERを0に。押し間違えても<b>5秒以内なら「元に戻す」</b>で、その間に走った距離ごと戻せます。');
+    ring('#rstInter'); await wait(1800); await tap('#rstInter'); ring('#undo'); await wait(4500);
+
+    cap(4, 'TCの目標時刻', '目標時刻は<b>区間表</b>から自動で設定。上の帯に残り時間、目標の<b>1分前から緑</b>に変わり、音声で「ゾーンに入れます」とお知らせします。');
+    ring('#strip'); jumpTo(at(9, 27, 56)); car.target = 6;
+    await untilV(at(9, 28, 5)); car.target = 0; await wait(2500);
+    cap(4, 'TCの目標時刻', '目標時刻ちょうどに<b>音声とチェックインボタンの点滅</b>でお知らせ。時計はアプリ版ではGPS時刻に自動で合わせます。');
+    jumpTo(at(9, 28, 57)); ring('#ciBtn'); await untilV(at(9, 29, 4)); await wait(1200);
+
+    cap(5, '1タップでチェックイン', '走行画面の下のボタンを<b>1タップ</b>。定刻・遅着・早着とペナルティは<b>JAFの規定どおり</b>に判定。次がSSなら<b>3分後のスタート時刻</b>と、区間表の<b>SS距離</b>が自動で入ります。');
+    D.S.ssRecords[0].sp = [car.lat, car.lon];   // 前回の「赤城」は同じ場所からスタートした
+    await tap('#ciBtn'); ring('#ssBox'); await wait(5500);
+
+    cap(6, 'SSのカウントダウン', 'スタート<b>30・15・10秒前は音声</b>、<b>5秒前から毎秒ビープ</b>。スタート地点の位置から、前に走ったコース（ここでは<b>「赤城」</b>）だと自動で判定します。');
+    jumpTo(at(9, 31, 28)); await untilV(at(9, 31, 33)); jumpTo(at(9, 31, 44, 300)); await untilV(at(9, 31, 59, 400));
+
+    cap(7, 'SS走行中', 'INTERの枠が<b>SSタイム</b>に切り替わります。右上は<b>前回同じコースを走った時との差</b>を同じ地点どうしでリアルタイム表示（速い＝<b>緑</b>・遅い＝赤）。右の枠はSSの距離と残り。');
+    await untilV(at(9, 32)); car.ssD0 = car.d; car.mode = 'ss'; ring('#interP');
+    await wait(2500); speed(3); await until(() => D.S.ssStartTotal != null && D.totalM() - D.S.ssStartTotal > 250);
+    ring('#ssDelta'); await wait(5000); ring('#ssBox');
+    await until(() => D.S.ssFinish != null);
+    car.mode = 'cruise'; car.target = 0; speed(1); ring(null);
+
+    cap(8, 'SS終了 → タイム入力', 'SS距離に届いたら<b>自動で終了</b>して目安タイムを記録（画面のボタンでも終了可）。ストップで言われた<b>正式タイム</b>を専用テンキーで入れると、<b>前回比</b>を表示します。');
+    await wait(4000); ring('#ssBox'); await wait(1500); await tap('#ssBox'); ring(null); await wait(800);
+    const r = D.S.ssRecords.at(-1), t = Math.round((r.f - r.s) / 100) + 2;
+    const mm = String(Math.floor(t / 600)).padStart(2, '0'), ss = String(Math.floor(t % 600 / 10)).padStart(2, '0');
+    await keys(mm + ss + (t % 10)); await wait(1500); await tap('#ssDlgOk'); await wait(3500);
+
+    cap(9, '区間表', 'タイムカードの<b>目標時刻を入れておくだけ</b>。各区間の所要時間に直し、チェックインのたびに<b>次のTCへ自動で進みます</b>。遅着しても次の目標は正しくずれます。');
+    car.target = 12; await tap('#tabs button[data-v="tc"]'); await wait(300);
+    if (W.document.getElementById('planEd').style.display === 'none') await tap('#planToggle');
+    W.document.getElementById('planEd').scrollIntoView({ block:'start' }); await wait(300); ring('#planList'); await wait(6500);
+
+    cap(10, '記録', 'SSの記録は<b>同じコースの前回比つき</b>で一覧に。LINEやメールでそのまま送れます。');
+    ring(null); await tap('#tabs button[data-v="set"]'); await wait(300); ring('#ssTable'); await wait(6000);
+
+    ring(null); await tap('#tabs button[data-v="drive"]');
+    cap(11, 'まとめ', `<ul class="sum">
+      <li><b>見やすさ</b>：数字は画面いっぱい・横画面標準・必要な情報だけ</li>
+      <li><b>押し間違いに強い</b>：大きなボタン、すべての操作を5秒間「元に戻す」</li>
+      <li><b>TC・SSの自動化</b>：区間表・JAF規定の判定・SSの自動スタート/終了</li>
+      <li><b>前回比</b>：同じコースをリアルタイムで比較</li>
+      <li><b>アプリ版</b>：画面を消しても計測を継続、GPS時刻、オフラインで動作</li></ul>
+      <p style="margin:10px 0 0;color:var(--dim);font-size:14px">「自分で触る」で画面を操作できます。</p>`);
+    $('barIn').style.width = '100%';
+  } catch (e) { if (!(e instanceof Stop)) console.error(e); }
+}
+
+// ---------- 操作 ----------
+function startDemo(){
+  W = fw.contentWindow; D = W.__demo; if (!D) return;
+  W.document.getElementById('startBtn').click();   // 音を出すにはタップの中で開始する
+  const sp = W.document.getElementById('splash'); if (sp) sp.remove();
+  $('intro').classList.add('off'); phone.classList.remove('free'); $('bFree').textContent = '自分で触る';
+  run();
+}
+$('intro').addEventListener('click', startDemo);
+$('bPause').addEventListener('click', () => {
+  paused = !paused; setRate(paused ? 0 : rateWant); $('bPause').textContent = paused ? '再生' : '一時停止';
+});
+$('bSkip').addEventListener('click', () => { skipping = true; if (paused) $('bPause').click(); });
+$('bRestart').addEventListener('click', () => {
+  runId++; ring(null); paused = false; $('bPause').textContent = '一時停止'; speed(1);
+  $('intro').classList.remove('off'); $('intro').querySelector('.t').textContent = 'もう一度再生';
+  fw.src = 'index.html?demo=1&r=' + Date.now(); D = null;
+});
+$('bFree').addEventListener('click', () => {
+  const free = !phone.classList.contains('free');
+  phone.classList.toggle('free', free); $('bFree').textContent = free ? '触るのをやめる' : '自分で触る';
+  if (free) { runId++; ring(null); speed(1); if (D) { car.mode = 'cruise'; car.target = 13; } }
+});
+</script>
+</body>
+</html>

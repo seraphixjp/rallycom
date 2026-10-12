@@ -348,7 +348,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
     </div>
     <div class="card">
       <div class="note" id="gpsInfo"></div>
-      <div class="note" id="verNote">ラリコン Web版 0.6.6</div>
+      <div class="note" id="verNote">ラリコン Web版 0.6.7</div>
       <div class="note">音声：VOICEVOX:四国めたん</div>
     </div>
   </section>
@@ -388,7 +388,10 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
 <script>
 'use strict';
 // ================= 状態 =================
-const KEY = 'rallycom.v1';
+// デモ（demo.html の中で ?demo=1 で開く）：保存データを使わず、時計と走行はデモ側が動かす
+const DEMO = new URLSearchParams(location.search).has('demo');
+let demoNow = null;
+const KEY = DEMO ? 'rallycom.demo' : 'rallycom.v1';
 const DEF = {
   totalRaw:0, interRaw:0, totalAdj:0, interAdj:0, factor:1,
   interDown:false, interTarget:0, frozen:false, frozenInter:0, frozenTotal:0,
@@ -409,7 +412,7 @@ const DEF = {
   ssTrace:[],     // 走行中のSSで100mごとの通過タイム（0.1秒単位）。記録に残して次回の比較に使う
 };
 let S = JSON.parse(JSON.stringify(DEF));   // DEFの配列を共有しないようにコピー
-try { Object.assign(S, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
+if (!DEMO) try { Object.assign(S, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
 S.frozen = S.frozen || false;
 let lastSave = 0;
 function save(){ lastSave = Date.now(); try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
@@ -424,7 +427,7 @@ const totalShown = () => S.frozen ? S.frozenTotal : totalM();
 const targetMs = () => (S.secStart != null && S.secDur > 0) ? S.secStart + S.secDur * 60000 : null;
 // アプリ版の中で動いている時は、GPS・GPS時刻・音声・バイブ・共有・画面の向きをアプリ側に任せる
 const NATIVE = window.RallyNative || null;
-const now = () => Date.now() + (R.gpsOffset || 0) + S.manualOffset;
+const now = () => demoNow ? demoNow() + S.manualOffset : Date.now() + (R.gpsOffset || 0) + S.manualOffset;
 
 // ================= 表示フォーマット =================
 const p2 = n => String(n).padStart(2, '0');
@@ -1226,7 +1229,7 @@ if (NATIVE) lockOrient();
 // 横（縦）固定が外れることがある：他のアプリから戻った・通知を引き出した・全画面が解除された等。
 // 画面に戻った時と、向きが違う状態でタップした時に固定し直す（Web版の全画面化はタップの中でしかできない）
 // 実際の画面の縦横（画面の形で判断。screen.orientation は端末によって当てにならない）
-const orientWrong = () => S.orient !== 'any' && !matchMedia(`(orientation: ${S.orient})`).matches;
+const orientWrong = () => !DEMO && S.orient !== 'any' && !matchMedia(`(orientation: ${S.orient})`).matches;
 // Web版（ブラウザで開いている時）：全画面が外れて向きが変わったら、タップを促す案内を出す
 // （ホーム画面に追加したアプリとして開いている時は全画面のままなので出さない）
 const isPwa = () => matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches;
@@ -1244,7 +1247,7 @@ document.addEventListener('pointerup', () => {
   if (!$('start').classList.contains('off') || !orientWrong()) return;
   if (NATIVE) lockOrient(); else if (matchMedia('(pointer:coarse)').matches) goFull(); else lockOrient();
 }, true);
-if (NATIVE) { try { $('verNote').textContent = 'ラリコン アプリ版 ' + NATIVE.version() + '（画面 Web版 0.6.6）'; } catch (e) {} }
+if (NATIVE) { try { $('verNote').textContent = 'ラリコン アプリ版 ' + NATIVE.version() + '（画面 Web版 0.6.7）'; } catch (e) {} }
 // 起動ロゴ：タップで飛ばせる・終わったら消す
 (() => { const sp = $('splash'); const end = () => sp.remove();
   sp.addEventListener('pointerdown', end); setTimeout(end, 2500); })();
@@ -1253,6 +1256,7 @@ on('startBtn', async () => {
   if ('speechSynthesis' in window) { const u = new SpeechSynthesisUtterance(''); speechSynthesis.speak(u); }
   $('start').classList.add('off');
   keepAwake();
+  if (DEMO) return;
   if (!SIM) startGps();
   if (NATIVE || matchMedia('(pointer:coarse)').matches) goFull();
 });
@@ -1269,7 +1273,11 @@ if (SIM) {
     onPos(lat, lon, 5, v, Date.now());
   }, 1000);
 }
-if (!NATIVE && 'serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+if (DEMO) window.__demo = {
+  get S(){ return S; }, A, R, onPos, save, now, totalM, openSsDlg, renderRec, renderPlan, fillTcInputs, hideUndo,
+  setClock(f){ demoNow = f; }, resetCues(){ lastSsCue = Infinity; zoneCued = 0; targetCued = 0; },
+};
+if (!NATIVE && !DEMO && 'serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 setInterval(tick, 100);
