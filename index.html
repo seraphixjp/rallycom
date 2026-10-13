@@ -381,7 +381,7 @@ td{padding:6px 4px;border-bottom:1px solid var(--line)}
     </div>
     <div class="card">
       <div class="note" id="gpsInfo"></div>
-      <div class="note" id="verNote">INTER ZERO Web版 2.4.4</div>
+      <div class="note" id="verNote">INTER ZERO Web版 2.5.0</div>
       <div class="note">音声：VOICEVOX:四国めたん</div>
     </div>
   </section>
@@ -455,10 +455,11 @@ let lastSave = 0;
 function save(){ lastSave = Date.now(); try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
 
 // 走行中だけの値（保存しない）
-const R = { speed:0, maxSpeed:0, acc:-1, lastFix:0, prev:null, prevSpeed:0, locked:false, running:false, gpsErr:'' };
+const R = { speed:0, maxSpeed:0, acc:-1, lastFix:0, prev:null, prevSpeed:0, locked:false, running:false, gpsErr:'', est:0, beepHi:null };
 
-const interM = () => S.interRaw * S.factor + S.interAdj;
-const totalM = () => S.totalRaw * S.factor + S.totalAdj;
+// R.est：GPSが途切れている間（トンネル）の推定距離。測位が戻ったら捨てて、実際の距離に置き換える
+const interM = () => (S.interRaw + R.est) * S.factor + S.interAdj;
+const totalM = () => (S.totalRaw + R.est) * S.factor + S.totalAdj;
 function interShown(){ const v = S.frozen ? S.frozenInter : interM(); return S.interDown ? S.interTarget - v : v; }
 const totalShown = () => S.frozen ? S.frozenTotal : totalM();
 // 区間表で今向かっているTCの行（種類 k：tc／sv＝サービスOUT／rg＝リグループOUT、early：早着OK）
@@ -479,7 +480,8 @@ function mmss(ms){ const neg = ms < 0, t = Math.floor(Math.abs(ms) / 1000); retu
 function stageTime(ms){ const t = Math.round(ms / 100); return Math.floor(t / 600) + ':' + p2(Math.floor((t % 600) / 10)) + '.' + (t % 10); }
 function diffText(d){ return d === 0 ? '定刻' : d > 0 ? `遅着 ${d}分（ペナ ${d * 10}秒）` : `早着 ${-d}分（ペナ ${-d}分）`; }
 // SSの走行中だけ使う値の初期値
-const ssFresh = () => ({ ssStartTotal:null, ssTrace:[], ssStartPos:null, ssMax:0 });
+// ssCand：SS距離に届いた時刻（フィニッシュ通過の候補）。止まった時に終了して、この時刻を記録する
+const ssFresh = () => ({ ssStartTotal:null, ssTrace:[], ssStartPos:null, ssMax:0, ssCand:null });
 const minFloor = ms => Math.floor(ms / 60000) * 60000;
 function minuteToday(h, m){
   const n = now(), d = new Date(n); d.setHours(h, m, 0, 0); let t = d.getTime();
@@ -500,6 +502,7 @@ function hav(a, b){
 function onPos(lat, lon, acc, speed, t){
   R.acc = acc;
   if (!(acc <= MAX_ACC)) return;
+  R.est = 0;
   const cur = { lat, lon, t };
   const v = (speed != null && isFinite(speed) && speed >= 0) ? speed : null;
   let add = 0, gap = false;
@@ -549,8 +552,11 @@ function onPos(lat, lon, acc, speed, t){
 // 距離のビープ：走ってINTERが区切り（500m等）を越えたら鳴らす。1km（区切り1kmなら5km）ごとは2回
 // ±ボタンで越えた時は鳴らさない（ここは測位で進んだ時だけ呼ぶ）
 function distBeep(a, b){
-  const st = S.beepStep; if (!S.distBeep || !(st > 0) || b <= a || b < st) return;
-  const k = Math.floor(b / st); if (k <= Math.floor(a / st)) return;
+  const st = S.beepStep; if (!S.distBeep || !(st > 0)) return;
+  const k = Math.floor(b / st);
+  if (R.beepHi != null && k < R.beepHi) R.beepHi = null;   // INTERが戻った（リセット・推定の巻き戻し）
+  if (b <= a || b < st || k <= Math.floor(a / st) || (R.beepHi != null && k <= R.beepHi)) return;
+  R.beepHi = k;
   const big = st >= 1000 ? 5000 : 1000;
   // 走行音に負けないよう最大音量・スマホのスピーカーが一番大きく鳴る2.5kHz付近
   beep(2500, 160, 1);
@@ -567,8 +573,9 @@ function ssProgress(tp, tf, dM){
   const r1 = totalM() - S.ssStartTotal, r0 = r1 - dM;
   const at = x => dM > 0 ? tp + (tf - tp) * Math.min(1, Math.max(0, (x - r0) / dM)) : tf;
   while (S.ssTrace.length * 100 <= r1 && S.ssTrace.length < 1000) S.ssTrace.push(Math.max(0, Math.round((at(S.ssTrace.length * 100) - S.ssStart) / 100)));
-  // SS距離に届いた＝フィニッシュ通過（目安）
-  if (S.ssDist > 0 && r1 >= S.ssDist) A.ssFinish(Math.max(at(S.ssDist), S.ssStart + 100));
+  // SS距離に届いた＝フィニッシュ通過の候補。GPSのずれで実際より早く届くことがあるので、ここでは終えない
+  // （ストップで止まった時に終了。走り続けている間はSS MODEのまま）
+  if (S.ssDist > 0 && r1 >= S.ssDist && S.ssCand == null) { S.ssCand = Math.max(at(S.ssDist), S.ssStart + 100); save(); }
 }
 let watchId = null;
 // アプリ版：画面が裏にある間の測位もまとめて届く（時刻つきなので距離は欠けない）
@@ -611,7 +618,7 @@ const A = {
   setTotalTo(m){ S.totalAdj = m - S.totalRaw * S.factor; save(); },
   down(m){ if (m == null) S.interDown = false; else Object.assign(S, { interDown:true, interTarget:m, interRaw:0, interAdj:0, frozen:false }); save(); },
   checkIn(){
-    const snap = JSON.parse(JSON.stringify({ tcRecords:S.tcRecords, tcLabel:S.tcLabel, ssStart:S.ssStart, ssFinish:S.ssFinish, ssTent:S.ssTent, secStart:S.secStart, secDur:S.secDur, nextIsSs:S.nextIsSs, planIdx:S.planIdx, ssDist:S.ssDist, ssStartTotal:S.ssStartTotal, ssTrace:S.ssTrace, ssStartPos:S.ssStartPos, ssMax:S.ssMax }));
+    const snap = JSON.parse(JSON.stringify({ tcRecords:S.tcRecords, tcLabel:S.tcLabel, ssStart:S.ssStart, ssFinish:S.ssFinish, ssTent:S.ssTent, secStart:S.secStart, secDur:S.secDur, nextIsSs:S.nextIsSs, planIdx:S.planIdx, ssDist:S.ssDist, ssStartTotal:S.ssStartTotal, ssTrace:S.ssTrace, ssStartPos:S.ssStartPos, ssMax:S.ssMax, ssCand:S.ssCand }));
     const row = S.planIdx != null ? S.plan[S.planIdx] : null;
     const actual = ciActual();
     const target = targetMs() ?? actual;
@@ -652,14 +659,14 @@ const A = {
   // SS終了（ストップで止まったら自動）。タイムは主催者に言われたものを後で入力
   ssFinish(at, manual){
     if (S.ssStart == null || S.ssFinish != null) return; const n = at ?? now(); if (n <= S.ssStart) return;
-    const snapSs = manual ? JSON.parse(JSON.stringify({ ssFinish:S.ssFinish, ssRecords:S.ssRecords, ssDist:S.ssDist, ssStartTotal:S.ssStartTotal, ssAwait:S.ssAwait, ssLabel:S.ssLabel, ssCourse:S.ssCourse, ssTrace:S.ssTrace, ssStartPos:S.ssStartPos, ssMax:S.ssMax })) : null;
+    const snapSs = manual ? JSON.parse(JSON.stringify({ ssFinish:S.ssFinish, ssRecords:S.ssRecords, ssDist:S.ssDist, ssStartTotal:S.ssStartTotal, ssAwait:S.ssAwait, ssLabel:S.ssLabel, ssCourse:S.ssCourse, ssTrace:S.ssTrace, ssStartPos:S.ssStartPos, ssMax:S.ssMax, ssCand:S.ssCand })) : null;
     const fin = Math.floor(n / 100) * 100;
     const ranD = S.ssStartTotal != null ? Math.round(totalM() - S.ssStartTotal) : 0;
     S.ssFinish = fin; S.ssRecords.push({ l:S.ssLabel, s:S.ssStart, f:fin, t:null, by:S.ssDist > 0 ? 'dist' : 'stop',
       d:S.ssDist || ranD, sp:S.ssStartPos, tr:(S.ssTrace || []).slice(), vx:Math.round(S.ssMax || 0),
       // コース名が無ければスタート地点（無ければ距離）で前回と同じコースか判定。初めてのコースは「SS1のコース」
       c:S.ssCourse || guessCourse(S.ssDist || ranD, S.ssStartPos) || `${S.ssLabel}のコース` });
-    S.ssDist = 0; S.ssStartTotal = null; S.ssCourse = ''; S.ssTrace = []; S.ssStartPos = null; S.ssMax = 0;
+    S.ssDist = 0; S.ssStartTotal = null; S.ssCourse = ''; S.ssTrace = []; S.ssStartPos = null; S.ssMax = 0; S.ssCand = null;
     S.ssAwait = S.ssRecords.length - 1; S.ssLabel = nextLabel(S.ssLabel);
     // SS終了でINTERを0に（5秒間は元に戻せる）
     const snapI = { interRaw:S.interRaw, interAdj:S.interAdj, interDown:S.interDown, frozen:S.frozen };
@@ -714,9 +721,19 @@ function say(t){
 const vib = ms => { if (NATIVE) NATIVE.vibrate(ms); else if (navigator.vibrate) navigator.vibrate(ms); };
 
 // ================= 毎100ms =================
-let lastSsCue = Infinity, zoneCued = 0, targetCued = 0, outCued = 0, gpsLostCued = false, stillSince = null;
+let lastSsCue = Infinity, zoneCued = 0, targetCued = 0, outCued = 0, gpsLostCued = false, stillSince = null, slowSince = null;
+// トンネル：途切れて3秒たったら、途切れた時の速さで進んだとみなす（最大3分。止まっていたら進めない）
+const EST_MAX = 180;
+function estTick(){
+  const age = gpsAge();
+  if (!R.running || !R.prev || age <= GAP || !isFinite(age) || R.prevSpeed < 2) return;
+  const i0 = interM();
+  R.est = R.prevSpeed * Math.min(age, EST_MAX);
+  distBeep(i0, interM());
+}
 function tick(){
   const n = now();
+  estTick();
   // SSカウントダウン
   if (S.ssStart != null && S.ssFinish == null && !S.ssTent) {
     const remain = S.ssStart - n, sec = Math.ceil(remain / 1000);
@@ -730,6 +747,11 @@ function tick(){
   if (S.ssStart != null && S.ssFinish == null && !S.ssTent && n >= S.ssStart && n - S.ssStart < 3600e3) {
     // 予備：GPSは生きているのに精度不足などでスタートが決まらない時（ふつうは測位の時刻で決まる）
     if (S.ssStartTotal == null && n - S.ssStart > 5000 && gpsAge() < 3) ssBegin(totalM());
+    // SS距離に届いた後、ストップで止まったら（15km/h未満が2秒）終了。記録は距離に届いた時刻
+    if (S.ssCand != null) {
+      if (gpsAge() < 3 && R.speed < 15) { slowSince = slowSince ?? n; if (n - slowSince > 2000) { slowSince = null; A.ssFinish(S.ssCand); } }
+      else slowSince = null;
+    }
     if (S.ssStartTotal != null && !(S.ssDist > 0) && n - S.ssStart > 60000) {
       // 距離が無い時の予備：500m以上走ってから8秒止まったらストップに着いたとみなす
       // （スタートが遅れて並んでいる間に終わらないように。GPSが途切れている時は判定しない）
@@ -844,7 +866,8 @@ function render(n){
   } else if (ssRun && S.ssDist > 0) {
     // 走行中は距離だけ（タイムは見る暇が無い）。こちらは残り距離＝パンク時の判断・ロストの目安
     const ran = S.ssStartTotal != null ? totalM() - S.ssStartTotal : 0;
-    bl = `${S.ssLabel} 残り km（全長 ${km(S.ssDist)}）`; bv = km(Math.max(0, S.ssDist - ran)); bc = 'var(--ok)'; bcls = 'run';
+    bl = S.ssCand != null ? `${S.ssLabel} フィニッシュ付近（止まったら終了）` : `${S.ssLabel} 残り km（全長 ${km(S.ssDist)}）`;
+    bv = km(Math.max(0, S.ssDist - ran)); bc = 'var(--ok)'; bcls = 'run';
   }
   box.className = 'panel' + (bl ? ' on ' + bcls : '');
   // SS枠が出ている間はTOTALを消して、その場所にSS枠を出す
@@ -893,7 +916,7 @@ function render(n){
   setText('interLab', ssCtl ? (ssPend ? `${S.ssLabel} 予定 ${hm(S.ssStart)}（タップで次の00秒にスタート）`
       : `${S.ssLabel} スタート ${hms(S.ssStart)}（もう一度押すとSTANDBYに戻る）`) : tcBig ? `${S.tcLabel} ${kdl}目標 ${hm(t)}　${tlab}（タップで距離に戻す）`
     : (ssRun ? `${S.ssLabel} ` : '') + (S.interDown ? 'INTER ▼ 残り km' : 'INTER km'));
-  $('badges').innerHTML = (S.frozen ? '<span class="badge">FREEZE</span>' : '') + (S.calibActive ? ' <span class="badge c">校正中</span>' : '');
+  $('badges').innerHTML = (R.est > 0 ? '<span class="badge">推定（GPSなし）</span> ' : '') + (S.frozen ? '<span class="badge">FREEZE</span>' : '') + (S.calibActive ? ' <span class="badge c">校正中</span>' : '');
   setText('stepL1', S.step + 'm'); setText('stepL2', S.step + 'm');
   $('view-drive').classList.toggle('ssrun', ssRun);
   $('view-drive').classList.toggle('tcbig', tcBig);
@@ -1395,7 +1418,7 @@ document.addEventListener('pointerup', () => {
   if (!$('start').classList.contains('off') || !orientWrong()) return;
   if (NATIVE) lockOrient(); else if (matchMedia('(pointer:coarse)').matches) goFull(); else lockOrient();
 }, true);
-if (NATIVE) { try { $('verNote').textContent = 'INTER ZERO アプリ版 ' + NATIVE.version() + '（画面 Web版 2.4.4）'; } catch (e) {} }
+if (NATIVE) { try { $('verNote').textContent = 'INTER ZERO アプリ版 ' + NATIVE.version() + '（画面 Web版 2.5.0）'; } catch (e) {} }
 // 起動ロゴ：タップで飛ばせる・終わったら消す
 (() => { const sp = $('splash'); const end = () => sp.remove();
   sp.addEventListener('pointerdown', end); setTimeout(end, 2500); })();

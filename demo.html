@@ -213,10 +213,11 @@ async function run(){
     await untilV(at(9, 32)); car.ssD0 = car.d; car.mode = 'ss'; ring('#interP');
     await wait(2500); speed(3); await until(() => D.S.ssStartTotal != null && D.totalM() - D.S.ssStartTotal > 250);
     ring('#ssBox'); await wait(5000); ring('#interP');
-    await until(() => D.S.ssFinish != null);
-    car.mode = 'cruise'; car.target = 0; speed(1); ring(null);
+    await until(() => D.S.ssCand != null); ring('#ssBox');
+    car.mode = 'cruise'; car.target = 0;                       // フィニッシュを過ぎてストップへ
+    await until(() => D.S.ssFinish != null); speed(1); ring(null);
 
-    cap(8, 'SS終了 → タイム入力', 'SS距離に届いたら<b>自動で終了</b>して目安タイムを記録（画面のボタンでも終了可）。ストップで言われた<b>正式タイム</b>を専用テンキーで入れると、<b>前回比</b>を表示します。');
+    cap(8, 'SS終了 → タイム入力', 'SS距離に届いて<b>ストップで止まったら自動で終了</b>（GPSのずれで早く届いても走っている間は終わらない）、目安タイムを記録（画面のボタンでも終了可）。ストップで言われた<b>正式タイム</b>を専用テンキーで入れると、<b>前回比</b>を表示します。');
     await wait(4000); ring('#ssBox'); await wait(1500); await tap('#ssBox'); ring(null); await wait(800);
     const r = D.S.ssRecords.at(-1), t = Math.round((r.f - r.s) / 100) + 2;
     const mm = String(Math.floor(t / 600)).padStart(2, '0'), ss = String(Math.floor(t % 600 / 10)).padStart(2, '0');
